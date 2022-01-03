@@ -1,13 +1,16 @@
 import asyncio
+
 import loopring
+from loopring.util.enums import Endpoints
 
 
 cfg = {
-
+    "account_id": 12345,
+    "api_key": "",
+    "endpoint": Endpoints.MAINNET
 }
 
-client = loopring.Client(66825, "", config=cfg)  # TODO: endpoint param
-
+client = loopring.Client(config=cfg)
 
 
 async def main():
