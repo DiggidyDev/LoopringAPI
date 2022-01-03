@@ -1,7 +1,14 @@
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 
 # TODO: Add unit tests
+
+
+class Endpoints(str, Enum):
+    MAINNET = "https://api3.loopring.io"
+
+    TESTNET_2 = "https://uat2.loopring.io"
+    TESTNET_3 = "https://uat3.loopring.io"
 
 
 class ErrorCodes(IntEnum):
@@ -58,7 +65,7 @@ class ErrorCodes(IntEnum):
 
     # Orders, Market, AMM Pools
     INCONSISTENT_TRANSFER_TOKEN_FEE_TOKEN = 102025  # Rename to `TOKEN_INCONSISTENCY`?
-    INVALID_ACCOUNT_ID = 104003  # Duplicates: (Order submission `102003`)
+    INVALID_ACCOUNT_ID = 104003  # Duplicate: (Order submission `102003`)
     INVALID_EXCHANGE_ID = 102001
     INVALID_NONCE = 102021
     INVALID_TRANSFER_SENDER = 102022
@@ -81,3 +88,8 @@ class ErrorCodes(IntEnum):
     DEPR_INTERNAL_PERSISTENCE_ERROR = 100203
     DEPR_REQUEST_TIMEOUT = 100002
     DEPR_UPDATE_FAILURE = 100202
+
+
+class Paths(str, Enum):
+    RELAYER_CURRENT_TIME = "/api/v3/timestamp"
+    STORAGE_ID = "/api/v3/storageId"
