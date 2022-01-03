@@ -7,19 +7,33 @@ import aiohttp
 
 from loopring.errors import *
 
-from .util.enums import Endpoints as ENDPOINT, ErrorCodes
+from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
 
 
 class Client:
 
-    def __init__(self, account_id, api_key, **config):
-        self.account_id = account_id
-        self.api_key = api_key
+    def __init__(self,
+                account_id: int=None,
+                api_key: str=None,
+                endpoint: ENDPOINT=None,
+                **config
+                ):
+        cfg = config["config"]
+        
+        if not (cfg.get("account_id") or account_id):
+            raise InvalidArguments("Missing account ID from config.")
+        
+        if not (cfg.get("api_key") or api_key):
+            raise InvalidArguments("Missing API Key from config.")
+        
+        if not (cfg.get("endpoint") or endpoint):
+            raise InvalidArguments("Missing endpoint from config.")
 
-        # TODO: Remember to add endpoint param to init
-        self.cur_endpoint = ENDPOINT.MAINNET
+        self.account_id = config.get("account_id") or account_id
+        self.api_key    = config.get("api_key")    or api_key
+        self.endpoint   = config.get("api_key")    or endpoint
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
@@ -39,7 +53,7 @@ class Client:
                 your control. Unlucky.
 
         """
-        url = self.cur_endpoint + PATH.RELAYER_CURRENT_TIME
+        url = self.endpoint + PATH.RELAYER_CURRENT_TIME
         
         async with self._session.get(url) as r:
             raw_content = await r.read()
@@ -50,14 +64,14 @@ class Client:
 
             return content["timestamp"]
 
-    async def get_next_storage_id(self, sellTokenID) -> dict:
+    async def get_next_storage_id(self, sellTokenID: int=None) -> dict:
         """Get the next storage ID.
 
-        Fetches the next order id for a given sold token. If the need
+        Fetches the next order ID for a given sold token. If the need
         arises to repeatedly place orders in a short span of time, the
-        order id can be initially fetched through the API and then managed
+        order ID can be initially fetched through the API and then managed
         locally.
-        Each new order id can be derived from adding 2 to the last one.
+        Each new order ID can be derived from adding 2 to the last one.
         
         Args:
             sellTokenID (int): The unique identifier of the token which the user
@@ -69,13 +83,17 @@ class Client:
             InvalidAccountID: Supplied account ID was deemed invalid.
             InvalidAPIKey: Supplied API Key was deemed invalid.
             InvalidArguments: Invalid arguments supplied.
+            TypeError: 'sellTokenID' argument supplied was not of type 'int'.
             UnknownError: Something has gone wrong. Probably out of
                 your control. Unlucky.
             UserNotFound: Didn't find the user from the given account ID.
 
         """
 
-        url = self.cur_endpoint + PATH.STORAGE_ID
+        if not sellTokenID:
+            raise InvalidArguments("Missing 'sellTokenID' argument.")
+
+        url = self.endpoint + PATH.STORAGE_ID
         headers = {
             "X-API-KEY": self.api_key
         }
