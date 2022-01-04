@@ -93,3 +93,5 @@ class ErrorCodes(IntEnum):
 class Paths(str, Enum):
     RELAYER_CURRENT_TIME = "/api/v3/timestamp"
     STORAGE_ID = "/api/v3/storageId"
+    ORDER = "/api/v3/order"
+    ORDERS = "/api/v3/orders"
