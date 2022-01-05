@@ -18,9 +18,27 @@ class UnknownError(LoopringError):
 
 class EmptyAPIKey(LoopringError):
 
-    def __init__(self, message=None):
+    def __init__(self, message: str=None):
         if not message:
             message = "Empty API key."
+        
+        super().__init__(message)
+
+
+class EmptyOrderhash(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Orderhash cannot be empty."
+        
+        super().__init__(message)
+
+
+class EmptyUser(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "User ID cannot be empty."
         
         super().__init__(message)
 
@@ -53,8 +71,16 @@ class InvalidArguments(LoopringError):
 
 class AddressNotFound(LoopringError):
 
-    def __init___(self):
+    def __init__(self):
         message = "Address wasn't found."
+        super().__init__(message)
+
+
+class OrderNotFound(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Order doesn't exist."
         super().__init__(message)
 
 
