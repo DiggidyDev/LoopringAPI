@@ -16,6 +16,16 @@ from .util.helpers import raise_errors_in, ratelimit
 
 
 class Client:
+    """The main class interacting with Loopring's API endpoints.
+    
+    Args:
+        account_id (int): The ID of the account belonging to the API Key.
+
+    """
+
+    account_id: int
+    api_key: str
+    endpoint: ENDPOINT
 
     def __init__(self,
                 account_id: int=None,
@@ -41,7 +51,9 @@ class Client:
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
 
-    async def close(self):
+    async def close(self) -> None:
+        """Close the client's active connection session."""
+        
         if not self._session.closed:
             await self._session.close()
     
@@ -50,9 +62,10 @@ class Client:
         """Get relayer's current timestamp.
         
         Returns:
-            int: The Epoch Unix Timestamp according to the relayer.
+            :class:`int`: The Epoch Unix Timestamp according to the relayer.
+
         Raises:
-            UnknownError: Something has gone wrong. Probably out of
+            :ref:UnknownError: Something has gone wrong. Probably out of
                 your control. Unlucky.
 
         """
@@ -79,14 +92,16 @@ class Client:
         Args:
             sell_token_id (int): The unique identifier of the token which the user
                 wants to sell in the next order.
+
         Returns:
             A :obj:`dict` containing the `orderId` and `offchainId`.
+
         Raises:
             EmptyAPIKey: No API Key was supplied.
             InvalidAccountID: Supplied account ID was deemed invalid.
             InvalidAPIKey: Supplied API Key was deemed invalid.
             InvalidArguments: Invalid arguments supplied.
-            TypeError: 'sell_token_id' argument supplied was not of type 'int'.
+            TypeError: 'sell_token_id' argument supplied was not of type :class:`int`.
             UnknownError: Something has gone wrong. Probably out of
                 your control. Unlucky.
             UserNotFound: Didn't find the user from the given account ID.
@@ -122,7 +137,7 @@ class Client:
                 find details of.
         
         Returns:
-            An :obj:`Order` object.
+            An :class:`~loopring.order.Order` object.
 
         Raises:
             InvalidArguments: Missing the 'orderhash' argument.
@@ -192,7 +207,8 @@ class Client:
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
         
         Returns:
-            A :obj:`list` of :obj:`Order` objects on a successful query.
+            List[:class:`~loopring.order.Order`]: A :obj:`list` of
+            :class:`~loopring.order.Order` objects on a successful query.
             The returned list could be empty if no orders met the given conditions.
 
         Raises:
