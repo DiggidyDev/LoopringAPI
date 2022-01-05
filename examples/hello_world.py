@@ -23,4 +23,5 @@ if __name__ == "__main__":
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main())
     finally:
+        # Prevents errors complaining about unclosed client sessions
         asyncio.ensure_future(client.close())
