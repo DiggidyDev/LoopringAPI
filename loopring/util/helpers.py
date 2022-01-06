@@ -2,8 +2,7 @@ from typing import Callable
 
 from aiolimiter import AsyncLimiter
 
-from loopring.errors import LoopringError
-from ..util.mappings import ERROR_MAPPINGS
+from ..util.mappings import Mappings
 
 
 def raise_errors_in(content: dict) -> None:
@@ -28,13 +27,16 @@ def raise_errors_in(content: dict) -> None:
             # even though the docs only mention 'msg'...
             message = content["resultInfo"].get("msg") or content["resultInfo"].get("message")
 
-            raise ERROR_MAPPINGS[error_occured](message)
+            raise Mappings.ERROR_MAPPINGS[error_occured](message)
 
 
 def ratelimit(rate: int, per: int) -> Callable:
     """A ratelimit decorator for an asynchronous function.
     
     Leaky bucket algorithm.
+
+    Warning:
+        This decorator has yet to be finished. W.I.P.
 
     Args:
         rate (int): The number of times the function can be executed.
