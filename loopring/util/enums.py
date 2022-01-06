@@ -22,7 +22,9 @@ class ErrorCodes(IntEnum):
     Note:
         Two sets of 'duplicates' were found in the documentation,
         returning the same error fundamentally, but via different
-        approaches.
+        approaches:
+
+        `102003`, `104003` & `108000`, `102005`
 
     Examples:
         Letting `resp` be a returned response from the API;
@@ -30,6 +32,7 @@ class ErrorCodes(IntEnum):
         >>> resp = { "code": 100001, "msg": "Invalid parameter." }
         >>> resp["code"] == ErrorCodes.INVALID_ARGUMENTS
         True
+
     """
 
     # General errors
@@ -82,12 +85,21 @@ class ErrorCodes(IntEnum):
 
     # ! Not yet implemented !
     IMPL_CONTRACT_NFT_URI = 500001
+    """
+    .. warning:: This error code has yet to be implemented (or at least \
+                isn't referenced in the official API docs).
+    
+    """
 
     # Possibly deprecated, but in documentation
     DEPR_DUPLICATE_REQUEST = 100204
+    """.. deprecated:: v0.0.1a"""
     DEPR_INTERNAL_PERSISTENCE_ERROR = 100203
+    """.. deprecated:: v0.0.1a"""
     DEPR_REQUEST_TIMEOUT = 100002
+    """.. deprecated:: v0.0.1a"""
     DEPR_UPDATE_FAILURE = 100202
+    """.. deprecated:: v0.0.1a"""
 
 
 class Paths(str, Enum):
