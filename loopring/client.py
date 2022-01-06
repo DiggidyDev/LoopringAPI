@@ -20,19 +20,29 @@ class Client:
     
     Args:
         account_id (int): The ID of the account belonging to the API Key.
+        api_key (str): The API Key associated with your L2 account.
+        endpoint (:class:`~loopring.util.enums.Endpoints`): The API endpoint \
+            to interact with.
+        handle_errors (bool): Whether the client should raise any exceptions returned \
+            from API responses. `False` would mean the raw JSON response
+            would be returned, and no exception would be raised.
 
     """
 
     account_id: int
     api_key: str
     endpoint: ENDPOINT
+    handle_errors: bool
 
     def __init__(self,
                 account_id: int=None,
                 api_key: str=None,
                 endpoint: ENDPOINT=None,
+                *,
+                handle_errors: bool=True,
                 **config
                 ):
+        self.__handle_errors = handle_errors
         cfg = config["config"]
         
         if not (cfg.get("account_id") or account_id):
@@ -51,6 +61,11 @@ class Client:
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
 
+    @property
+    def handle_errors(self) -> bool:
+        return self.__handle_errors
+
+
     async def close(self) -> None:
         """Close the client's active connection session."""
         
@@ -65,7 +80,7 @@ class Client:
             :class:`int`: The Epoch Unix Timestamp according to the relayer.
 
         Raises:
-            :ref:UnknownError: Something has gone wrong. Probably out of
+            UnknownError: Something has gone wrong. Probably out of
                 your control. Unlucky.
 
         """
@@ -76,7 +91,8 @@ class Client:
 
             content: dict = json.loads(raw_content.decode())
 
-            raise_errors_in(content)
+            if self.handle_errors:
+                raise_errors_in(content)
 
             return content["timestamp"]
 
@@ -125,7 +141,8 @@ class Client:
 
             content: dict = json.loads(raw_content.decode())
 
-            raise_errors_in(content)
+            if self.handle_errors:
+                raise_errors_in(content)
 
             return content
 
@@ -161,7 +178,8 @@ class Client:
 
             content: dict = json.loads(raw_content.decode())
 
-            raise_errors_in(content)
+            if self.handle_errors:
+                raise_errors_in(content)
 
             order: Order = Order(**content)
 
@@ -174,7 +192,7 @@ class Client:
                                 offset: int=0,
                                 order_types: str=None,
                                 side: str=None,
-                                start: int=None,
+                                start: int=0,
                                 status: str=None,
                                 trade_channels: str=None
                                 ) -> List[Order]:
@@ -247,7 +265,8 @@ class Client:
 
             content: dict = json.loads(raw_content.decode())
 
-            raise_errors_in(content)
+            if self.handle_errors:
+                raise_errors_in(content)
 
             orders: List[Order] = []
 
