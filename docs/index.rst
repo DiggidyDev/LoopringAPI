@@ -10,6 +10,7 @@ Welcome to LoopringAPI's documentation!
    apireference
    quickstart
    errors
+   util
 
 
 
@@ -23,3 +24,4 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`quickstart`
 * :ref:`search`
+* :ref:`util`
