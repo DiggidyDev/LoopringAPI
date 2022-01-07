@@ -80,8 +80,8 @@ class ErrorCodes(IntEnum):
     # Account interactions
     EMPTY_API_KEY = 104001
     EMPTY_SIG = 104004
-    INCORRECT_SIG = 104005
     INVALID_API_KEY = 104002
+    INVALID_SIG = 104005
 
     # ! Not yet implemented !
     IMPL_CONTRACT_NFT_URI = 500001
