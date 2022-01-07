@@ -1,9 +1,16 @@
-from typing import Union
+from typing import Any, Union
 from loopring.util.mappings import Mappings
 
 
 
 class Validity:
+    """A class representative of an order's validity.
+    
+    Attributes:
+        end (int): ...
+        start (int): ...
+    
+    """
     
     end: int
     start: int
@@ -17,6 +24,16 @@ class Validity:
 
 
 class Volume:
+    """A class wrapping data regarding an order's volume.
+    
+    Attributes:
+        base_amount (str): ...
+        base_filled (str): ...
+        fee (str): ...
+        quote_amount (str): ...
+        quote_filled (str): ...
+    
+    """
     
     base_amount: str
     base_filled: str
@@ -38,9 +55,38 @@ class Volume:
             f"quote_amount='{self.quote_amount}' quote_filled='{self.quote_filled}'>"
 
 
+class PartialOrder:
+    """Partial order.
+    
+    Attributes:
+        is_idempotent (bool): ...
+    
+    """
 
-class Order:
-    """Shouldn't need to call directly."""
+    client_order_id: str
+    hash: str
+    is_idempotent: bool
+    status: str
+
+
+class Order(PartialOrder):
+    """You shouldn't need to directly instantiate an :obj:`Order` object.
+
+    Attributes:
+        client_order_id (str): The client-side ID of the order.
+        hash (str): The order's hash.
+        market (str): The trading pair associated with the order.
+        order_type (str): Whether the order was a limit, maker, or taker.
+        price (str): The price at which the order was executed.
+        side (str): Indicator of a sell or buy.
+        status (str): The order's current state (`cancelled`, `cancelling`, \
+            `expired`, `processed`, `processing`, `waiting`)
+        trade_channel (str): The order's channel origin (`order_book`, \
+            `amm_pool`, `mixed`)
+        validity (:obj:`Validity`): ...
+        volumes (:class:`Volume`): ...
+
+    """
 
     client_order_id: str
     hash: str
@@ -52,6 +98,11 @@ class Order:
     trade_channel: str
     validity: Validity
     volumes: Volume
+
+    def __getattribute__(self, __name: str) -> Any:
+        if __name in ("is_idempotent"):
+            raise AttributeError(f"type object 'Order' has no attribute '{__name}'")
+        return super().__getattribute__(__name)
 
     def __init__(self, **data) -> None:
         self.__json = data
@@ -103,7 +154,7 @@ class Order:
         the event that an exception occurs, you'll receive a :py:class:`dict`
         containing the raw error response data.
         
-        .. seealso:: :class:`~.util.mappings.Mappings.ERROR_MAPPINGS`
+        .. seealso:: :class:`~loopring.util.mappings.Mappings.ERROR_MAPPINGS`
             in case you have disabled :obj:`Client.handle_errors`
             and wish to handle the raw error JSON response yourself.
 
