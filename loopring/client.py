@@ -6,7 +6,8 @@ from typing import List
 import aiohttp
 
 from loopring.errors import *
-from loopring.order import Order
+from loopring.order import Order, PartialOrder
+from loopring.token import Token
 
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
@@ -65,126 +66,12 @@ class Client:
     def handle_errors(self) -> bool:
         return self.__handle_errors
 
-
     async def close(self) -> None:
         """Close the client's active connection session."""
-        
+
         if not self._session.closed:
             await self._session.close()
-    
-    # @ratelimit(5, 1)  # Work in progress
-    async def get_relayer_timestamp(self) -> int:
-        """Get relayer's current timestamp.
-        
-        Returns:
-            :class:`int`: The Epoch Unix Timestamp according to the relayer.
 
-        Raises:
-            UnknownError: Something has gone wrong. Probably out of
-                your control. Unlucky.
-
-        """
-        url = self.endpoint + PATH.RELAYER_CURRENT_TIME
-        
-        async with self._session.get(url) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-
-            return content["timestamp"]
-
-    async def get_next_storage_id(self, sell_token_id: int=None) -> dict:
-        """Get the next storage ID.
-
-        Fetches the next order ID for a given sold token. If the need
-        arises to repeatedly place orders in a short span of time, the
-        order ID can be initially fetched through the API and then managed
-        locally.
-        Each new order ID can be derived from adding 2 to the last one.
-        
-        Args:
-            sell_token_id (int): The unique identifier of the token which the user
-                wants to sell in the next order.
-
-        Returns:
-            A :obj:`dict` containing the `orderId` and `offchainId`.
-
-        Raises:
-            EmptyAPIKey: No API Key was supplied.
-            InvalidAccountID: Supplied account ID was deemed invalid.
-            InvalidAPIKey: Supplied API Key was deemed invalid.
-            InvalidArguments: Invalid arguments supplied.
-            TypeError: 'sell_token_id' argument supplied was not of type :class:`int`.
-            UnknownError: Something has gone wrong. Probably out of
-                your control. Unlucky.
-            UserNotFound: Didn't find the user from the given account ID.
-
-        """
-
-        if not sell_token_id:
-            raise InvalidArguments("Missing 'sellTokenID' argument.")
-
-        url = self.endpoint + PATH.STORAGE_ID
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = {
-            "accountId": self.account_id,
-            "sellTokenId": sell_token_id
-        }
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-
-            return content
-
-    async def get_order_details(self, orderhash: str=None) -> Order:
-        """Get the details of an order based on order hash.
-        
-        Args:
-            orderhash (str): The orderhash belonging to the order you want to
-                find details of.
-        
-        Returns:
-            An :class:`~loopring.order.Order` object.
-
-        Raises:
-            InvalidArguments: Missing the 'orderhash' argument.
-
-        """
-
-        if not orderhash:
-            raise InvalidArguments("Missing 'orderhash' argument.")
-        
-        url = self.endpoint + PATH.ORDER
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = {
-            "accountId": self.account_id,
-            "orderHash": orderhash
-        }
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-
-            order: Order = Order(**content)
-
-            return order
-        
     async def get_multiple_orders(self, *,
                                 end: int=0,
                                 limit: int=50,
@@ -275,3 +162,171 @@ class Client:
 
             return orders
 
+    async def get_next_storage_id(self, sell_token_id: int=None) -> dict:
+        """Get the next storage ID.
+
+        Fetches the next order ID for a given sold token. If the need
+        arises to repeatedly place orders in a short span of time, the
+        order ID can be initially fetched through the API and then managed
+        locally.
+        Each new order ID can be derived from adding 2 to the last one.
+        
+        Args:
+            sell_token_id (int): The unique identifier of the token which the user
+                wants to sell in the next order.
+
+        Returns:
+            :obj:`dict`: A :obj:`dict` containing the `orderId` and `offchainId`.
+
+        Raises:
+            EmptyAPIKey: No API Key was supplied.
+            InvalidAccountID: Supplied account ID was deemed invalid.
+            InvalidAPIKey: Supplied API Key was deemed invalid.
+            InvalidArguments: Invalid arguments supplied.
+            TypeError: 'sell_token_id' argument supplied was not of type :class:`int`.
+            UnknownError: Something has gone wrong. Probably out of
+                your control. Unlucky.
+            UserNotFound: Didn't find the user from the given account ID.
+
+        """
+
+        if not sell_token_id:
+            raise InvalidArguments("Missing 'sellTokenID' argument.")
+
+        url = self.endpoint + PATH.STORAGE_ID
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": self.account_id,
+            "sellTokenId": sell_token_id
+        }
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            return content
+
+    async def get_order_details(self, orderhash: str=None) -> Order:
+        """Get the details of an order based on order hash.
+        
+        Args:
+            orderhash (str): The orderhash belonging to the order you want to
+                find details of.
+        
+        Returns:
+            :class:`~loopring.order.Order`: An instance of the order based on \
+                the given orderhash.
+
+        Raises:
+            InvalidArguments: Missing the 'orderhash' argument.
+
+        """
+
+        if not orderhash:
+            raise InvalidArguments("Missing 'orderhash' argument.")
+        
+        url = self.endpoint + PATH.ORDER
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": self.account_id,
+            "orderHash": orderhash
+        }
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            order: Order = Order(**content)
+
+            return order
+
+    # @ratelimit(5, 1)  # Work in progress
+    async def get_relayer_timestamp(self) -> int:
+        """Get relayer's current timestamp.
+
+        Returns:
+            :class:`int`: The Epoch Unix Timestamp according to the relayer.
+
+        Raises:
+            UnknownError: Something has gone wrong. Probably out of
+                your control. Unlucky.
+
+        """
+        url = self.endpoint + PATH.RELAYER_CURRENT_TIME
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            return content["timestamp"]
+
+    async def submit_order(self,
+                        *,
+                        affiliate: str=None,
+                        all_or_none: str,
+                        buy_token: Token,
+                        client_order_id: str=None,
+                        exchange: str,
+                        fill_amount_b_or_s: str,
+                        max_fee_bips: int,
+                        order_type: str=None,
+                        pool_address: str=None,
+                        sell_token: Token,
+                        storage_id: int,
+                        taker: str=None,
+                        trade_channel: str=None,
+                        valid_until: int
+                    ) -> PartialOrder:
+        """Submit an order.
+        
+        Args:
+            affiliate (str): An account ID to receive a share of the
+                order's fee.
+            all_or_none (str): Whether the order supports partial fills
+                or not. Currently only supports `'false'`.
+            buy_token (:obj:`~loopring.token.Token`): Wrapper object used \
+                to describe a token associated with a certain quantity.
+            client_order_id (str): An arbitrary, unique client-side
+                order ID.
+            eddsa_signature (str): The order's EdDSA signature. The signature \
+                is a hexadecimal string obtained by signing the order itself \
+                and concatenating the resulting signature parts (Rx, Ry, and \
+                S). Used to authenticate and authorize the operation.
+            exchange (str): The address of the exchange used to process
+                this order.
+            fill_amount_b_or_s (str): Fill the size by the buy or sell token.
+            max_fee_bips (int): Maximum order fee that the user can accept, \
+                value range (in ten thousandths) 1 ~ 63.
+            order_type (str): The type of order: `'LIMIT_ORDER'`, `'AMM'`, \
+                `'MAKER_ONLY'`, `'TAKER_ONLY'`.
+            pool_address (str): The AMM pool address if order type is AMM.
+            sell_token (:obj:`~loopring.token.Token`): Wrapper object used \
+                to describe a token associated with a certain quantity.
+            storage_id (int): The unique ID of the L2 Merkle tree storage \
+                slot where the burn made in order to exit the pool will be \
+                stored or has been stored.
+            taker (str): Used by the P2P order, where the user needs to \
+                specify the taker's address.
+            trade_channel (str): The channel to be used when ordering: \
+                `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
+            valid_until (int): The order expiry time, in seconds.
+
+        
+        """
+        pass
