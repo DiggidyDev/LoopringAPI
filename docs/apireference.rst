@@ -25,11 +25,17 @@ Client
 ------
 .. automodule:: loopring.client
    :members:
+   :undoc-members: handle_errors
 
 
 Order
 -----
 .. autoclass:: loopring.order.Order
+   :members:
+
+PartialOrder
+~~~~~~~~~~~~
+.. autoclass:: loopring.order.PartialOrder
    :members:
 
 Validity
