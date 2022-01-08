@@ -56,10 +56,13 @@ class Volume:
 
 
 class PartialOrder:
-    """Partial order.
+    """A partial order object, usually returned when making a new order.
     
     Attributes:
+        client_order_id (str): ...
+        hash (str): ...
         is_idempotent (bool): ...
+        status (str): ...
     
     """
 
@@ -68,9 +71,64 @@ class PartialOrder:
     is_idempotent: bool
     status: str
 
+    def __init__(self, **data):
+        self.__json = data
+
+        if self._is_error(data):
+            return
+
+        for k in data.keys():
+            if not k.islower():
+                setattr(self, Mappings.ORDER_ATTR_MAPPINGS[k], data[k])
+            
+            else:
+                setattr(self, k, data[k])
+    
+    def __repr__(self) -> str:
+        if self._is_error():
+            return "<Incomplete PartialOrder>"
+
+        return f"<hash='{self.hash}' id='{self.client_order_id}' " + \
+            f"is_idempotent={self.is_idempotent} status='{self.status}'>"
+    
+    def __str__(self) -> str:
+        if self._is_error():
+            return f"Incomplete {self.__class__.__name__}."
+        
+        return self.hash
+    
+    def _is_error(self, init: dict=None) -> bool:
+        # On an unsuccessful response, the only data in
+        # the dictionary would be "resultInfo" along
+        # with an error code.
+        if not init:
+            return not hasattr(self, "hash")
+        
+        return len(self.__json) < 2
+
+    @property
+    def json(self) -> dict[str, Union[str, dict[str, Union[str, int]]]]:
+        """Returns the original data from which the object was initialised.
+
+        Disabling :obj:`~loopring.client.Client.handle_errors` will prevent
+        exceptions from being raised. On a successful response, you will
+        still have an :obj:`~loopring.order.PartialOrder` or
+        :obj:`~loopring.order.Order` object returned, but in the event that
+        an exception occurs, you'll receive a :py:class:`dict` containing
+        the raw error response data.
+        
+        .. seealso:: :class:`~loopring.util.mappings.Mappings.ERROR_MAPPINGS`
+            in case you have disabled :obj:`~loopring.client.Client.handle_errors`
+            and wish to handle the raw error JSON response yourself.
+
+        """
+        return self.__json
+
 
 class Order(PartialOrder):
     """You shouldn't need to directly instantiate an :obj:`Order` object.
+
+    This class inherits from :obj:`~loopring.order.PartialOrder`.
 
     Attributes:
         client_order_id (str): The client-side ID of the order.
@@ -100,14 +158,14 @@ class Order(PartialOrder):
     volumes: Volume
 
     def __getattribute__(self, __name: str) -> Any:
-        if __name in ("is_idempotent"):
+        if __name in ("is_idempotent",):
             raise AttributeError(f"type object 'Order' has no attribute '{__name}'")
         return super().__getattribute__(__name)
 
     def __init__(self, **data) -> None:
-        self.__json = data
+        super().__init__(**data)
 
-        if self.__is_error():
+        if self._is_error(data):
             return
 
         for k in data:
@@ -124,39 +182,10 @@ class Order(PartialOrder):
                 setattr(self, k, data[k])
     
     def __repr__(self) -> str:
-        if self.__is_error():
-            return f"<Incomplete order>"
+        if self._is_error():
+            return f"<Incomplete Order>"
 
         return f"<hash='{self.hash}' id='{self.client_order_id}' " + \
             f"side='{self.side}' market='{self.market}' price='{self.price}' " + \
             f"order_type='{self.order_type}' trade_channel='{self.trade_channel}' " + \
             f"status='{self.status}' validity={self.validity} volumes={self.volumes}>"
-    
-    def __str__(self) -> str:
-        if self.__is_error():
-            return "Incomplete order object."
-
-        return self.hash
-    
-    def __is_error(self):
-        # On an unsuccessful response, the only data in
-        # the dictionary would be "resultInfo" along
-        # with an error code.
-        return len(self.json) < 2
-
-    @property
-    def json(self) -> dict[str, Union[str, dict[str, Union[str, int]]]]:
-        """Returns the original data from which the object was initialised.
-
-        Disabling :obj:`Client.handle_errors` will prevent
-        exceptions from being raised. On a successful response, you will
-        still have an :obj:`~loopring.order.Order` object returned, but in
-        the event that an exception occurs, you'll receive a :py:class:`dict`
-        containing the raw error response data.
-        
-        .. seealso:: :class:`~loopring.util.mappings.Mappings.ERROR_MAPPINGS`
-            in case you have disabled :obj:`Client.handle_errors`
-            and wish to handle the raw error JSON response yourself.
-
-        """
-        return self.__json
