@@ -53,7 +53,7 @@ class ErrorCodes(IntEnum):
     NO_ORDER_TO_CANCEL = 102117
     ORDER_ALREADY_EXISTS = 102007
     ORDER_ALREADY_EXPIRED = 102008
-    ORDER_AMOUNT_EXEECEDED = 102020
+    ORDER_AMOUNT_EXCEEDED = 102020
     ORDER_AMOUNT_TOO_SMALL = 102012
     ORDER_CANCEL_FAILURE = 102118
     ORDER_INVALID_ACCOUNT_ID = 102003  # Duplicate: (Orders, Market, AMM Pools `104003`)
@@ -93,13 +93,13 @@ class ErrorCodes(IntEnum):
 
     # Possibly deprecated, but in documentation
     DEPR_DUPLICATE_REQUEST = 100204
-    """.. deprecated:: v0.0.1a"""
+    """.. deprecated:: 0.0.1a"""
     DEPR_INTERNAL_PERSISTENCE_ERROR = 100203
-    """.. deprecated:: v0.0.1a"""
+    """.. deprecated:: 0.0.1a"""
     DEPR_REQUEST_TIMEOUT = 100002
-    """.. deprecated:: v0.0.1a"""
+    """.. deprecated:: 0.0.1a"""
     DEPR_UPDATE_FAILURE = 100202
-    """.. deprecated:: v0.0.1a"""
+    """.. deprecated:: 0.0.1a"""
 
 
 class Paths(str, Enum):
