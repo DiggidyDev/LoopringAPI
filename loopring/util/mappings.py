@@ -8,7 +8,7 @@ class Mappings:
     """A class containing some useful dictionaries.
     
     These shouldn't be any real reason to be using this, unless
-    you've disabled :attr:`~loopring.client.Client.handle_errors` \ 
+    you've disabled :obj:`~loopring.client.Client.handle_errors` \ 
     and know what you're doing.
 
     """
@@ -34,10 +34,12 @@ class Mappings:
         ERR.INVALID_USER_BALANCE: InvalidUserBalance,
 
         ERR.NON_EXISTENT_ORDER: OrderNotFound,
+        ERR.NO_ORDER_TO_CANCEL: NoOrderToCancel,
         ERR.ORDER_ALREADY_EXISTS: OrderAlreadyExists,
         ERR.ORDER_ALREADY_EXPIRED: OrderAlreadyExpired,
         ERR.ORDER_AMOUNT_EXCEEDED: OrderAmountExceeded,
         ERR.ORDER_AMOUNT_TOO_SMALL: OrderAmountTooSmall,
+        ERR.ORDER_CANCEL_FAILURE: OrderCancellationFailed,
         ERR.ORDER_INVALID_ACCOUNT_ID: OrderInvalidAccountID,
         ERR.ORDER_MISSING_SIG: OrderMissingSignature,
         ERR.ORDER_UNSUPPORTED_MARKET: OrderUnsupportedMarket,
@@ -51,6 +53,7 @@ class Mappings:
 
     ORDER_ATTR_MAPPINGS = {
         "clientOrderId": "client_order_id",
+        "isIdempotent": "is_idempotent",
         "orderType": "order_type",
         "tradeChannel": "trade_channel"
     }

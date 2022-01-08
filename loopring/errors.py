@@ -143,6 +143,14 @@ class InvalidUserBalance(LoopringError):
         super().__init__(message)
 
 
+class NoOrderToCancel(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Couldn't find an order to cancel."
+        super().__init__(message)
+
+
 class OrderAlreadyExists(LoopringError):
 
     def __init__(self, message: str=None):
@@ -172,6 +180,14 @@ class OrderAmountExceeded(LoopringError):
     def __init__(self, message: str=None):
         if not message:
             message = "Exceeded the maximum order amount."
+        super().__init__(message)
+
+
+class OrderCancellationFailed(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Failed to cancel the order."
         super().__init__(message)
 
 
