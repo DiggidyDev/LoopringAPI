@@ -26,8 +26,8 @@ class EDDSASign:
         
         return msg_hash 
     
-    def sign(self, data):
-        msg_hash = self.hash(data)
+    def sign(self, request: Request):
+        msg_hash = self.hash(request)
         signed_msg = PoseidonEdDSA.sign(msg_hash, self.private_key)
 
         return "0x" + "".join([
@@ -99,7 +99,6 @@ class UrlEDDSASign(EDDSASign):
         params = request.params
         payload = request.payload
 
-
         url = urllib.parse.quote(host + path, safe="")
 
         if method in ["GET", "DELETE"]:
@@ -108,8 +107,6 @@ class UrlEDDSASign(EDDSASign):
                 k, v in params.items()]), safe=""
                 )
         elif method in ["POST", "PUT"]:
-            assert payload is not None
-
             data = urllib.parse.quote(
                 json.dumps(payload, separators=(",", ":")), safe=""
             )
@@ -131,7 +128,17 @@ class OrderEDDSASign(EDDSASign):
     
     def serialise(self, order):
         return [
-
+            int(order["exchange"], 16),
+            int(order["storageId"]),
+            int(order["accountId"]),
+            int(order["sellToken"]["id"]),
+            int(order["buyToken"]["id"]),
+            int(order["sellToken"]["volume"]),
+            int(order["buyToken"]["volume"]),
+            int(order["validUntil"]),
+            int(order["maxFeeBips"]),
+            int(order["fillAmountBOrS"]),
+            int(order.get("taker", "0x0"), 16)
         ]
 
 
