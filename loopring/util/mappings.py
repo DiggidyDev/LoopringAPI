@@ -33,8 +33,8 @@ class Mappings:
         ERR.INVALID_RATE: InvalidRate,
         ERR.INVALID_USER_BALANCE: InvalidUserBalance,
 
-        ERR.NON_EXISTENT_ORDER: OrderNotFound,
         ERR.NO_ORDER_TO_CANCEL: NoOrderToCancel,
+        ERR.NON_EXISTENT_ORDER: OrderNotFound,
         ERR.ORDER_ALREADY_EXISTS: OrderAlreadyExists,
         ERR.ORDER_ALREADY_EXPIRED: OrderAlreadyExpired,
         ERR.ORDER_AMOUNT_EXCEEDED: OrderAmountExceeded,
