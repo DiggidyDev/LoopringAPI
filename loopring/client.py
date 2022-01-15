@@ -5,19 +5,25 @@ from typing import List
 
 import aiohttp
 
-from loopring.errors import *
-from loopring.order import Order, PartialOrder
-from loopring.token import Token
-
+from .errors import *
+from .order import Order, PartialOrder
+from .token import Token
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
+from .util.request import Request
+from .util.sdk.sig.eddsa import UrlEDDSASign
 
-# TODO: In the future, return custom objects instead of dicts
+# TODO: Do something about exception classes... it's getting a bit messy.
+#       Also, rewrite some of the descriptions.
+#       Idea: group some of the error codes under other errors? e.g.
+#       `OrderNotFound` could also be used when there isn't an order to cancel...
 
 
 class Client:
     """The main class interacting with Loopring's API endpoints.
+
+    .. _Examples: quickstart.html
     
     Args:
         account_id (int): The ID of the account belonging to the API Key.
@@ -27,6 +33,9 @@ class Client:
         handle_errors (bool): Whether the client should raise any exceptions returned \
             from API responses. `False` would mean the raw JSON response
             would be returned, and no exception would be raised.
+        **config (dict): A dictionary-based version of the positional arguments. \
+            It may be preferred to use this method over positional arguments, as \
+            shown in the `Examples`_.
 
     """
 
@@ -34,6 +43,9 @@ class Client:
     api_key: str
     endpoint: ENDPOINT
     handle_errors: bool
+    private_key: str
+    publicX: str
+    publicY: str
 
     def __init__(self,
                 account_id: int=None,
@@ -41,10 +53,14 @@ class Client:
                 endpoint: ENDPOINT=None,
                 *,
                 handle_errors: bool=True,
+                private_key: str=None,
+                publicX: str=None,
+                publicY: str=None,
                 **config
                 ):
         self.__handle_errors = handle_errors
-        cfg = config["config"]
+        
+        cfg = config.get("config", {})
         
         if not (cfg.get("account_id") or account_id):
             raise InvalidArguments("Missing account ID from config.")
@@ -54,17 +70,99 @@ class Client:
         
         if not (cfg.get("endpoint") or endpoint):
             raise InvalidArguments("Missing endpoint from config.")
+        
+        if not (cfg.get("private_key") or private_key):
+            raise InvalidArguments("Missing Private Key from config.")
+        
+        if not (cfg.get("publicX") or publicX):
+            raise InvalidArguments("Missing publicX from config.")
+        
+        if not (cfg.get("publicY") or publicY):
+            raise InvalidArguments("Missing publicY from config.")
 
-        self.account_id = cfg.get("account_id") or account_id
-        self.api_key    = cfg.get("api_key")    or api_key
-        self.endpoint   = cfg.get("endpoint")   or endpoint
+        self.account_id  = cfg.get("account_id")  or account_id
+        self.api_key     = cfg.get("api_key")     or api_key
+        self.endpoint    = cfg.get("endpoint")    or endpoint
+        self.private_key = cfg.get("private_key") or private_key
+        self.publicX     = cfg.get("publicX")     or publicX
+        self.publicY     = cfg.get("publicY")     or publicY
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
 
     @property
     def handle_errors(self) -> bool:
+        """A flag denoting whether errors should be raised from API responses.
+
+        .. _documentation page: https://docs.loopring.io/en
+
+        If set to `False`, you will receive a :py:class:`dict` containing
+        the raw response from the API, which you will then need to deal with
+        yourself. You'll be able to find the error codes from the respective
+        `documentation page`_.  
+        However, if set to `True`, all errors will be handled for you and raised
+        where necessary from responses.
+
+        .. seealso:: :class:`~loopring.util.mappings.Mappings.ERROR_MAPPINGS`
+            in case you wish to handle the raw error JSON response yourself.
+
+        """
         return self.__handle_errors
+
+    async def cancel_order(self,
+                        *,
+                        client_order_id: str=None,
+                        orderhash: str=None
+                        ) -> PartialOrder:
+        """Cancel order using order hash or client-side ID.
+
+        Args:
+            client_order_id (str): ...
+            orderhash (str): ...
+
+        Returns:
+            :obj:`~loopring.order.PartialOrder`: ...
+        
+        Raises:
+            EmptyAPIKey: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            NoOrderToCancel: ...
+            OrderCancellationFailed: ...
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.ORDER
+        params = {
+            "accountId": self.account_id,
+            "clientOrderId": client_order_id,
+            "orderHash": orderhash
+        }
+
+        # Filter out unused params
+        params = {k: v for k, v in params.items() if v}
+
+        req = Request("delete", self.endpoint, PATH.ORDER, params=params)
+
+        helper = UrlEDDSASign(self.private_key, self.endpoint)
+        api_sig = helper.sign(req)
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": api_sig
+        }
+        async with self._session.delete(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            order: PartialOrder = PartialOrder(**content)
+
+            return order
 
     async def close(self) -> None:
         """Close the client's active connection session."""
@@ -212,7 +310,7 @@ class Client:
 
             return content
 
-    async def get_order_details(self, orderhash: str=None) -> Order:
+    async def get_order_details(self, orderhash: str) -> Order:
         """Get the details of an order based on order hash.
         
         Args:
@@ -228,9 +326,6 @@ class Client:
 
         """
 
-        if not orderhash:
-            raise InvalidArguments("Missing 'orderhash' argument.")
-        
         url = self.endpoint + PATH.ORDER
         headers = {
             "X-API-KEY": self.api_key
@@ -276,6 +371,7 @@ class Client:
 
             return content["timestamp"]
 
+    # TODO: Test this method
     async def submit_order(self,
                         *,
                         affiliate: str=None,
@@ -292,7 +388,7 @@ class Client:
                         taker: str=None,
                         trade_channel: str=None,
                         valid_until: int
-                    ) -> PartialOrder:
+                        ) -> PartialOrder:
         """Submit an order.
         
         Args:
@@ -304,18 +400,15 @@ class Client:
                 to describe a token associated with a certain quantity.
             client_order_id (str): An arbitrary, unique client-side
                 order ID.
-            eddsa_signature (str): The order's EdDSA signature. The signature \
-                is a hexadecimal string obtained by signing the order itself \
-                and concatenating the resulting signature parts (Rx, Ry, and \
-                S). Used to authenticate and authorize the operation.
             exchange (str): The address of the exchange used to process
                 this order.
-            fill_amount_b_or_s (str): Fill the size by the buy or sell token.
+            fill_amount_b_or_s (str): Fill the size by the `'BUY'` or `'SELL'` \
+                token.
             max_fee_bips (int): Maximum order fee that the user can accept, \
                 value range (in ten thousandths) 1 ~ 63.
             order_type (str): The type of order: `'LIMIT_ORDER'`, `'AMM'`, \
                 `'MAKER_ONLY'`, `'TAKER_ONLY'`.
-            pool_address (str): The AMM pool address if order type is AMM.
+            pool_address (str): The AMM Pool address if order type is `'AMM'`.
             sell_token (:obj:`~loopring.token.Token`): Wrapper object used \
                 to describe a token associated with a certain quantity.
             storage_id (int): The unique ID of the L2 Merkle tree storage \
@@ -327,6 +420,73 @@ class Client:
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
             valid_until (int): The order expiry time, in seconds.
 
+        Returns:
+            :class:`~loopring.order.PartialOrder`: The order just submitted.
+
+        Raises:
+            EmptyAPIKey: ... .
+            EmptySignature: ... .
+            FailedToFreeze: ... .
+            FailedToSubmit: ... .
+            InvalidAPIKey: ... .
+            InvalidAccountID: ... .
+            InvalidArguments: ... .
+            InvalidExchangeID: ... .
+            InvalidNonce: ... .
+            InvalidOrder: ... .
+            InvalidOrderID: ... .
+            InvalidRate: ... .
+            InvalidSignature: ... .
+            InvalidUserBalance: ... .
+            OrderAlreadyExists: ... .
+            OrderAlreadyExpired: ... .
+            OrderAmountExceeded: ... .
+            OrderAmountTooSmall: ... .
+            OrderInvalidAccountID: ... .
+            OrderMissingSignature: ... .
+            OrderUnsupportedMarket: ... .
+            UnknownError: ... .
+            UnsupportedTokenID: ... .
         
         """
-        pass
+
+        eddsa_signature = None  # TODO
+
+        url = self.endpoint + PATH.ORDER
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": self.account_id,
+            "affiliate": affiliate,
+            "allOrNone": all_or_none,
+            "buyToken": buy_token,
+            "clientOrderId": client_order_id,
+            "eddsaSignature": eddsa_signature,
+            "exchange": exchange,
+            "fillAmountBOrS": fill_amount_b_or_s,
+            "maxFeeBips": max_fee_bips,
+            "orderType": order_type,
+            "poolAddress": pool_address,
+            "sellToken": sell_token,
+            "storageId": storage_id,
+            "taker": taker,
+            "tradeChannel": trade_channel,
+            "validUntil": valid_until
+        }
+
+        # Filter out unused params
+        params = {k: v for k, v in params.items() if v}
+
+        async with self._session.post(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            order: PartialOrder = PartialOrder(**content)
+
+            return order
+
