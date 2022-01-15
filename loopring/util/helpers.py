@@ -20,12 +20,13 @@ def raise_errors_in(content: dict) -> None:
     """
 
     if content.get("resultInfo"):
-        error_occured = content["resultInfo"].get("code") or False
+        result = content.get("resultInfo")
+        error_occured = result.get("code") or False
 
         if error_occured:
             # For some reason it could return as 'msg' or 'message',
             # even though the docs only mention 'msg'...
-            message = content["resultInfo"].get("msg") or content["resultInfo"].get("message")
+            message = result.get("msg") or result.get("message")
 
             raise Mappings.ERROR_MAPPINGS[error_occured](message)
 
