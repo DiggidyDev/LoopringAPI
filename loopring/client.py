@@ -12,7 +12,7 @@ from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
 from .util.request import Request
-from .util.sdk.sig.eddsa import UrlEDDSASign
+from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -169,6 +169,55 @@ class Client:
 
         if not self._session.closed:
             await self._session.close()
+
+    async def get_api_key(self) -> str:
+        """Get the API Key associated with an account.
+        
+        Requires private key for X-API-SIG header signing.
+
+        Returns:
+            str: The API Key associated with the account ID.
+
+        Raises:
+            EmptyAPIKey: ...
+            EmptySignature: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            InvalidSignature: ...
+            UnknownError: ...
+            UserNotFound: ...
+
+        """
+
+        params = {
+            "accountId": self.account_id
+        }
+
+        request = Request(
+            "get",
+            self.endpoint,
+            PATH.API_KEY,
+            params=params
+        )
+
+        helper = UrlEDDSASign(private_key=self.private_key)
+        x_api_sig = helper.sign(request)
+
+        headers = {
+            "X-API-SIG": x_api_sig
+        }
+
+        url = self.endpoint + PATH.API_KEY
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            return content["apiKey"]
 
     async def get_multiple_orders(self, *,
                                 end: int=0,
@@ -453,16 +502,13 @@ class Client:
         eddsa_signature = None  # TODO
 
         url = self.endpoint + PATH.ORDER
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = {
+
+        payload = {
             "accountId": self.account_id,
             "affiliate": affiliate,
             "allOrNone": all_or_none,
             "buyToken": buy_token,
             "clientOrderId": client_order_id,
-            "eddsaSignature": eddsa_signature,
             "exchange": exchange,
             "fillAmountBOrS": fill_amount_b_or_s,
             "maxFeeBips": max_fee_bips,
@@ -476,9 +522,25 @@ class Client:
         }
 
         # Filter out unused params
-        params = {k: v for k, v in params.items() if v}
+        payload = {k: v for k, v in payload.items() if v}
 
-        async with self._session.post(url, headers=headers, params=params) as r:
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.ORDER,
+            payload=payload
+        )
+
+        helper = OrderEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(request.payload)
+
+        payload["eddsaSignature"] = eddsa_signature
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
             raw_content = await r.read()
 
             content: dict = json.loads(raw_content.decode())
@@ -489,4 +551,57 @@ class Client:
             order: PartialOrder = PartialOrder(**content)
 
             return order
+
+    async def update_api_key(self) -> str:
+        """Update the account's API Key.
+        
+        Returns:
+            str: Your account's new API Key.
+        
+        Raises:
+            EmptyAPIKey: ...
+            EmptySignature: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            InvalidArguments: ...
+            InvalidSignature: ...
+            UnknownError: ...
+            UserNotFound: ...
+
+        """
+
+        payload = {
+            "accountId": self.account_id
+        }
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.API_KEY,
+            payload=payload
+        )
+
+        helper = UrlEDDSASign(private_key=self.private_key)
+        x_api_sig = helper.sign(request)
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": x_api_sig
+        }
+
+        url = self.endpoint + PATH.API_KEY
+
+        # Use `json=` for POST, and `params=` for GET
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            new_api_key = content["apiKey"]
+            self.api_key = new_api_key
+
+            return self.api_key
 
