@@ -22,7 +22,6 @@ class Mappings:
         ERR.FAILED_TO_FREEZE_AMOUNT: FailedToFreeze,
         ERR.FAILED_TO_SUBMIT_ORDER: FailedToSubmit,
 
-        ERR.INVALID_SIG: InvalidSignature,
         ERR.INVALID_ACCOUNT_ID: InvalidAccountID,
         ERR.INVALID_API_KEY: InvalidAPIKey,
         ERR.INVALID_ARGUMENTS: InvalidArguments,
@@ -31,6 +30,7 @@ class Mappings:
         ERR.INVALID_ORDER: InvalidOrder,
         ERR.INVALID_ORDER_ID: InvalidOrderID,
         ERR.INVALID_RATE: InvalidRate,
+        ERR.INVALID_SIG: InvalidSignature,
         ERR.INVALID_USER_BALANCE: InvalidUserBalance,
 
         ERR.NO_ORDER_TO_CANCEL: NoOrderToCancel,
