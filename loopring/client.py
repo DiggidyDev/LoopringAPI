@@ -8,7 +8,7 @@ import aiohttp
 from .errors import *
 from .market import Market
 from .order import Order, PartialOrder
-from .token import Token
+from .token import Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
@@ -221,10 +221,10 @@ class Client:
             return content["apiKey"]
 
     async def get_market_configurations(self) -> List[Market]:
-        """Get all market configs.
+        """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
         Returns:
-            List[:obj:`Market`]: All the markets.
+            List[:obj:`~loopring.market.Market`]: All the markets.
         
         Raises:
             UnknownError: ...
@@ -578,6 +578,36 @@ class Client:
 
             return order
 
+    async def get_token_configurations(self) -> List[TokenConfig]:
+        """Return the configs of all supporoted tokens (Ether included).
+        
+        Returns:
+            List[:obj:`~loopring.token.TokenConfig`]: Token configs.
+        
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.TOKENS
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            token_confs = []
+
+            for t in content:
+                print(t, type(t))
+                token_confs.append(TokenConfig(**t))
+            
+            return token_confs
+
+    # TODO: rename to `regenerate_api_key()`?
     async def update_api_key(self) -> str:
         """Update the account's API Key.
         
