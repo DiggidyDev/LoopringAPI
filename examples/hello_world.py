@@ -10,12 +10,22 @@ cfg = {
     "endpoint": Endpoints.MAINNET
 }
 
-client = loopring.Client(config=cfg)
+client = loopring.Client(handle_errors=True, config=cfg)
 
 
 async def main():
-    resp = await client.get_next_storage_id(0)
-    print(resp)
+
+    markets = await client.get_market_configurations()
+
+    print(markets)
+
+    for m in markets:
+        if not m.enabled:
+            print(m)
+
+    # orders = await client.get_multiple_orders()
+    # for _ in orders:
+    #     print(_.hash)
 
 
 if __name__ == "__main__":
