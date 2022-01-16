@@ -1,13 +1,14 @@
 import asyncio
 import json
 from asyncio.events import AbstractEventLoop
-from typing import List
+from typing import List, Union
 
 import aiohttp
 
 from .errors import *
-from .market import Market
-from .order import Order, PartialOrder
+from .exchange import Exchange
+from .market import Market, Ticker
+from .order import Order, OrderBook, PartialOrder
 from .token import Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
@@ -220,6 +221,28 @@ class Client:
 
             return content["apiKey"]
 
+    async def get_exchange_configurations(self) -> Exchange:
+        """Get configurations of loopring's exchange.
+
+        Returns:
+            :obj:`~loopring.exchange.Exchange`: ...
+
+        """
+
+        url = self.endpoint + PATH.EXCHANGES
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            exchange = Exchange(**content)
+            
+            return exchange
+
     async def get_market_configurations(self) -> List[Market]:
         """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
@@ -247,6 +270,79 @@ class Client:
                 markets.append(Market(**m))
             
             return markets
+
+    async def get_market_orderbook(self,
+        market: str="LRC-ETH",
+        *,
+        price_aggregation: int=2,
+        limit: int=50) -> OrderBook:
+        """Get the orderbook of a specific market (trading pair).
+
+        Args:
+            limit (int): Default 50.
+            market (str): Default 'LRC-ETH'.
+            price_aggregation (int): Default 2.
+        
+        Returns:
+            :obj:`loopring.order.Orderbook`: ... .
+
+        Raises:
+            OrderbookUnsupportedMarket: ...
+            UnknownError: ...
+            UnsupportedDepthLevel: ...
+
+        """
+
+        url = self.endpoint + PATH.DEPTH
+
+        params = {
+            "level": price_aggregation,
+            "limit": limit,
+            "market": market
+        }
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            orderbook = OrderBook(**content)
+
+            return orderbook
+
+    async def get_market_ticker(self,
+        market: str="LRC-ETH") -> Union[Ticker, List[Ticker]]:
+        """Get a ticker for a specific market or multiple markets.
+        
+        Raises:
+            InvalidArguments: ...
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.TICKER
+
+        params = {
+            "market": market
+        }
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            tickers = []
+
+            for t in content["tickers"]:
+                tickers.append(Ticker(*t))
+
+            return tickers[0] if len(tickers) == 1 else tickers
 
     async def get_multiple_orders(self, *,
                                 end: int=0,

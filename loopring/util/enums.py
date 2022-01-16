@@ -27,7 +27,7 @@ class ErrorCodes(IntEnum):
 
     Examples:
         Letting `resp` be a returned response from the API;
-        
+
         >>> resp = { "code": 100001, "msg": "Invalid parameter." }
         >>> resp["code"] == ErrorCodes.INVALID_ARGUMENTS
         True
@@ -104,11 +104,14 @@ class ErrorCodes(IntEnum):
 class Paths(str, Enum):
 
     API_KEY = "/api/v3/apiKey"
+    DEPTH = "/api/v3/depth"
+    EXCHANGES = "/api/v3/exchange/info"
     MARKETS = "/api/v3/exchange/markets"
     ORDER = "/api/v3/order"
     ORDERS = "/api/v3/orders"
     RELAYER_CURRENT_TIME = "/api/v3/timestamp"
     STORAGE_ID = "/api/v3/storageId"
+    TICKER = "/api/v3/ticker"
     TOKENS = "/api/v3/exchange/tokens"
 
 
