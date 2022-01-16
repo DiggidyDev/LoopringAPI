@@ -49,3 +49,17 @@ def ratelimit(rate: int, per: int) -> Callable:
         limit: AsyncLimiter = AsyncLimiter(rate, per)
         
     return wrapper
+
+
+def to_snake_case(target: str) -> str:
+    """Take a 'camelCase' string and return its 'snake_case' format."""
+
+    result = ""
+
+    for _ in list(target):
+        if _.isupper():
+            result += f"_{_.lower()}"
+            continue
+        result += _
+    
+    return result

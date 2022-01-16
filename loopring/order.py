@@ -1,5 +1,5 @@
 from typing import Any, Union
-from loopring.util.mappings import Mappings
+from .util.helpers import to_snake_case
 
 
 
@@ -43,11 +43,7 @@ class Volume:
 
     def __init__(self, **data) -> None:
         for k in data:
-            if not k.islower():
-                setattr(self, Mappings.VOLUME_ATTR_MAPPINGS[k], data[k])
-                continue
-
-            setattr(self, k, data[k])
+            setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
         return f"<base_amount='{self.base_amount}' " + \
@@ -78,11 +74,7 @@ class PartialOrder:
             return
 
         for k in data.keys():
-            if not k.islower():
-                setattr(self, Mappings.ORDER_ATTR_MAPPINGS[k], data[k])
-            
-            else:
-                setattr(self, k, data[k])
+            setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
         if self._is_error():
@@ -169,17 +161,14 @@ class Order(PartialOrder):
             return
 
         for k in data:
-            if not k.islower():
-                setattr(self, Mappings.ORDER_ATTR_MAPPINGS[k], data[k])
-            
-            elif k == "validity":
+            if k == "validity":
                 setattr(self, k, Validity(**data[k]))
             
             elif k == "volumes":
                 setattr(self, k, Volume(**data[k]))
-            
+
             else:
-                setattr(self, k, data[k])
+                setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
         if self._is_error():

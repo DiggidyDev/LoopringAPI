@@ -50,17 +50,3 @@ class Mappings:
     }
     """dict[:class:`~loopring.util.enums.ErrorCodes`, \ 
     :exc:`~loopring.errors.LoopringError`]"""
-
-    ORDER_ATTR_MAPPINGS = {
-        "clientOrderId": "client_order_id",
-        "isIdempotent": "is_idempotent",
-        "orderType": "order_type",
-        "tradeChannel": "trade_channel"
-    }
-
-    VOLUME_ATTR_MAPPINGS = {
-        "baseAmount": "base_amount",
-        "baseFilled": "base_filled",
-        "quoteAmount": "quote_amount",
-        "quoteFilled": "quote_filled"
-    }
