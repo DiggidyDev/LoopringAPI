@@ -105,10 +105,11 @@ class Paths(str, Enum):
 
     API_KEY = "/api/v3/apiKey"
     MARKETS = "/api/v3/exchange/markets"
-    RELAYER_CURRENT_TIME = "/api/v3/timestamp"
-    STORAGE_ID = "/api/v3/storageId"
     ORDER = "/api/v3/order"
     ORDERS = "/api/v3/orders"
+    RELAYER_CURRENT_TIME = "/api/v3/timestamp"
+    STORAGE_ID = "/api/v3/storageId"
+    TOKENS = "/api/v3/exchange/tokens"
 
 
 class IntSig(IntEnum):
