@@ -43,8 +43,10 @@ class Mappings:
         ERR.ORDER_INVALID_ACCOUNT_ID: OrderInvalidAccountID,
         ERR.ORDER_MISSING_SIG: OrderMissingSignature,
         ERR.ORDER_UNSUPPORTED_MARKET: OrderUnsupportedMarket,
+        ERR.ORDERBOOK_UNSUPPORTED_MARKET: OrderbookUnsupportedMarket,
 
         ERR.UNKNOWN_ERROR: UnknownError,
+        ERR.UNSUPPORTED_DEPTH_LEVEL: UnsupportedDepthLevel,
         ERR.UNSUPPORTED_TOKEN_ID: UnsupportedTokenID,
         ERR.USER_NOT_FOUND: UserNotFound
     }

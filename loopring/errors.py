@@ -183,6 +183,14 @@ class OrderAmountExceeded(LoopringError):
         super().__init__(message)
 
 
+class OrderbookUnsupportedMarket(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Unsupported market."
+        super().__init__(message)
+
+
 class OrderCancellationFailed(LoopringError):
 
     def __init__(self, message: str=None):
@@ -228,6 +236,14 @@ class UnknownError(LoopringError):
     def __init__(self, message: str=None):
         if not message:
             message = "An unknown error occured."
+        super().__init__(message)
+
+
+class UnsupportedDepthLevel(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Unsupported depth level."
         super().__init__(message)
 
 
