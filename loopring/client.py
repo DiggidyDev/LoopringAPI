@@ -6,6 +6,7 @@ from typing import List
 import aiohttp
 
 from .errors import *
+from .market import Market
 from .order import Order, PartialOrder
 from .token import Token
 from .util.enums import Endpoints as ENDPOINT
@@ -219,6 +220,34 @@ class Client:
 
             return content["apiKey"]
 
+    async def get_market_configurations(self) -> List[Market]:
+        """Get all market configs.
+        
+        Returns:
+            List[:obj:`Market`]: All the markets.
+        
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.MARKETS
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            markets = []
+
+            for m in content["markets"]:
+                markets.append(Market(**m))
+            
+            return markets
+
     async def get_multiple_orders(self, *,
                                 end: int=0,
                                 limit: int=50,
@@ -420,7 +449,6 @@ class Client:
 
             return content["timestamp"]
 
-    # TODO: Test this method
     async def submit_order(self,
                         *,
                         affiliate: str=None,
@@ -498,8 +526,6 @@ class Client:
             UnsupportedTokenID: ... .
         
         """
-
-        eddsa_signature = None  # TODO
 
         url = self.endpoint + PATH.ORDER
 
