@@ -18,6 +18,14 @@ def raise_errors_in(content: dict) -> None:
         LoopringError: The default base class for all Loopring exceptions.
 
     """
+    if not isinstance(content, dict):
+        # For some reason, `get_token_configurations()` returns
+        # a list instead of a dict :p
+        #
+        # And because of that, we can assume that the request
+        # was successful, otherwise an error would've been
+        # returned in a dict
+        return
 
     if content.get("resultInfo"):
         result = content.get("resultInfo")
@@ -51,15 +59,33 @@ def ratelimit(rate: int, per: int) -> Callable:
     return wrapper
 
 
-def to_snake_case(target: str) -> str:
-    """Take a 'camelCase' string and return its 'snake_case' format."""
+def to_snake_case(camel: str) -> str:
+    """Take a 'camelCase' string and return its 'snake_case' format.
 
-    result = ""
-
-    for _ in list(target):
-        if _.isupper():
-            result += f"_{_.lower()}"
-            continue
-        result += _
+    This is primarily used in conjunction with :py:func:`setattr()`
+    when dynamically instantiating classes when interacting with the
+    API.
     
-    return result
+    Examples:
+        >>> c = "myStringContents"
+        >>> s = to_snake_case(c)
+        >>> s
+        'my_string_contents'
+    
+    Args:
+        camel (str): The target camelCase string to turn into snake_case.
+    
+    Returns:
+        str: The snake_case equivalent of the `camel` input.
+
+    """
+
+    snake = ""
+
+    for _ in list(camel):
+        if _.isupper():
+            snake += f"_{_.lower()}"
+            continue
+        snake += _
+    
+    return snake
