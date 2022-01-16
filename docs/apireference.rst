@@ -28,6 +28,12 @@ Client
    :undoc-members: handle_errors
 
 
+Market
+------
+.. autoclass:: loopring.market.Market
+   :members:
+   
+
 Order
 -----
 .. autoclass:: loopring.order.Order
