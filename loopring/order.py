@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any, List, Union
 from .util.helpers import to_snake_case
 
 
@@ -178,3 +178,73 @@ class Order(PartialOrder):
             f"side='{self.side}' market='{self.market}' price='{self.price}' " + \
             f"order_type='{self.order_type}' trade_channel='{self.trade_channel}' " + \
             f"status='{self.status}' validity={self.validity} volumes={self.volumes}>"
+
+
+class _OrderBookOrder:
+    
+    price: str
+    quantity: int
+    size: int
+    volume: int
+
+    def __init__(self, price, size: int, volume: int, quantity: int) -> None:
+        self.price = price
+        self.quantity = int(quantity)
+        self.size = int(size)
+        self.volume = int(volume)
+    
+    def __repr__(self) -> str:
+        return f"<price='{self.price}' quantity='{self.quantity}' " + \
+            f"size='{self.size}' volume='{self.size}'>"
+    
+    def __str__(self) -> str:
+        return f"{self.quantity} {self.__class__.__name__.lower()}" + \
+            f"{'s' if self.quantity != 1 else ' '} @ {self.price} " + \
+            f"({self.size} size @ {self.volume} volume)"
+
+
+class Ask(_OrderBookOrder):
+    pass
+
+
+class Bid(_OrderBookOrder):
+    pass
+
+
+class OrderBook:
+
+    asks: List[Ask]
+    bids: List[Bid]
+    market: str
+    timestamp: int  # TODO: Better timestamp (datetime module?)
+    version: int
+
+    def __init__(self, **data):
+        for k in data.keys():
+            if k == "asks":
+                asks = []
+
+                for a in data[k]:
+                    asks.append(Ask(*a))
+
+                setattr(self, to_snake_case(k), asks)
+            elif k == "bids":
+                bids = []
+
+                for b in data[k]:
+                    bids.append(Bid(*b))
+                
+                setattr(self, to_snake_case(k), bids)
+            else:
+                setattr(self, to_snake_case(k), data[k])
+    
+    def __len__(self) -> int:
+        return sum(_.quantity for _ in [*self.asks, *self.bids])
+
+    def __repr__(self) -> str:
+        return f"<market='{self.market}' version='{self.version}' " + \
+            f"timestamp={self.timestamp} asks={self.asks} bids={self.bids}>"
+
+    def __str__(self) -> str:
+        return f"{self.__len__()} orders: {self.market} @ {self.timestamp}"
+
