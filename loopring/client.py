@@ -248,7 +248,7 @@ class Client:
 
         Args:
             currency (str): All supported values: "`USD`", "`CNY`", "`JPY`", 
-            "`EUR`", "`GBP`", "`HKD`". Defaults to "`USD`".
+                "`EUR`", "`GBP`", "`HKD`". Defaults to "`USD`".
         
         Returns:
             List[:obj:`~loopring.token.Price`]: ... .
@@ -757,20 +757,31 @@ class Client:
         
         """
 
+        if fill_amount_b_or_s.lower() == "buy":
+            fill_amount_b_or_s = 1
+        else:
+            fill_amount_b_or_s = 0
+
         url = self.endpoint + PATH.ORDER
 
         payload = {
             "accountId": self.account_id,
             "affiliate": affiliate,
             "allOrNone": all_or_none,
-            "buyToken": buy_token,
+            "buyToken": {
+                "tokenId": buy_token.id,
+                "volume": buy_token.volume
+            },
             "clientOrderId": client_order_id,
             "exchange": exchange,
             "fillAmountBOrS": fill_amount_b_or_s,
             "maxFeeBips": max_fee_bips,
             "orderType": order_type,
             "poolAddress": pool_address,
-            "sellToken": sell_token,
+            "sellToken": {
+                "tokenId": sell_token.id,
+                "volume": sell_token.volume
+            },
             "storageId": storage_id,
             "taker": taker,
             "tradeChannel": trade_channel,

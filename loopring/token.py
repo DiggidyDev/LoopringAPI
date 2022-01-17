@@ -86,12 +86,12 @@ class Token:
     """
 
     id: int
-    volume: str
+    volume: int
 
     def __getitem__(self, __name) -> Any:
         return self.__dict__[__name]
 
-    def __init__(self, *, id: int=None, volume: str=None):
+    def __init__(self, *, id: int=None, volume: int=None):
         self.id = id
         self.volume = volume
 
