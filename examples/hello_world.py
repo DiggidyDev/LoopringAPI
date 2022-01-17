@@ -15,10 +15,9 @@ client = loopring.Client(handle_errors=True, config=cfg)
 
 async def main():
 
-    candlesticks = await client.get_market_candlestick("LRC-USDT")
-
-    for c in candlesticks:
-        print(c)
+    prices = await client.get_fiat_prices()
+    for p in prices:
+        print(p)
 
 
 if __name__ == "__main__":
