@@ -7,7 +7,7 @@ import aiohttp
 
 from .errors import *
 from .exchange import Exchange
-from .market import Market, Ticker
+from .market import Candlestick, Market, Ticker
 from .order import Order, OrderBook, PartialOrder
 from .token import Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
@@ -243,6 +243,58 @@ class Client:
             
             return exchange
 
+    async def get_market_candlestick(self,
+        market: str="LRC-ETH",
+        interval:str="5min",
+        *,
+        start: int=None,
+        end: int=None,
+        limit: int=None) -> List[Candlestick]:
+        """Get candlestick data for a given `market` (trading pair).
+
+        Args:
+            market (str): Defaults to "`LRC-ETH`".
+            interval (str): All supported values;
+                `1min`, `5min`, `15min`, `30min`, `1hr`, `2hr`, `4hr`,
+                `12hr`, `1d`, `1w`. Defaults to `5min`.
+            start (int): ... .
+            end (int): ... .
+            limit (int): Number of datapoints - if more are available, only
+                the first limit data points will be returned.
+        
+        Raises:
+            InvalidArguments: ...
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.CANDLESTICK
+
+        params = {
+            "market": market,
+            "interval": interval,
+            "start": start,
+            "end": end,
+            "limit": limit
+        }
+
+        params = {k: v for k, v in params.items() if v}
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            candlesticks = []
+
+            for c in content["candlesticks"]:
+                candlesticks.append(Candlestick(*c))
+
+            return candlesticks
+
     async def get_market_configurations(self) -> List[Market]:
         """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
@@ -313,8 +365,7 @@ class Client:
 
             return orderbook
 
-    async def get_market_ticker(self,
-        market: str="LRC-ETH") -> Union[Ticker, List[Ticker]]:
+    async def get_market_ticker(self, market: str="LRC-ETH") -> List[Ticker]:
         """Get a ticker for a specific market or multiple markets.
         
         Raises:
@@ -342,7 +393,7 @@ class Client:
             for t in content["tickers"]:
                 tickers.append(Ticker(*t))
 
-            return tickers[0] if len(tickers) == 1 else tickers
+            return tickers
 
     async def get_multiple_orders(self, *,
                                 end: int=0,
