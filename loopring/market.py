@@ -37,7 +37,7 @@ class Ticker:
     lowest_price: str
     market: str
     number_of_trades: int
-    open_price: str
+    opening_price: str
     quote_token_volume: int
     timestamp: int
 
@@ -52,7 +52,7 @@ class Ticker:
         timestamp,
         base_token_volume,
         quote_token_volume,
-        open_price,
+        opening_price,
         highest_price,
         lowest_price,
         closing_price,
@@ -65,7 +65,7 @@ class Ticker:
         self.timestamp          = timestamp or "N/A"
         self.base_token_volume  = base_token_volume or "N/A"
         self.quote_token_volume = quote_token_volume or "N/A"
-        self.open_price         = open_price or "N/A"
+        self.opening_price      = opening_price or "N/A"
         self.highest_price      = highest_price or "N/A"
         self.lowest_price       = lowest_price or "N/A"
         self.closing_price      = closing_price or "N/A"
@@ -84,9 +84,51 @@ class Ticker:
         return f"<market='{self.market}' highest_price='{self.highest_price}' " + \
             f"lowest_price='{self.lowest_price}' highest_bid='{self.highest_bid}' " + \
             f"lowest_ask='{self.lowest_ask}' closing_price='{self.closing_price}' " + \
-            f"open_price='{self.open_price}' timestamp={self.timestamp} " + \
+            f"opening_price='{self.opening_price}' timestamp={self.timestamp} " + \
             f"base_token_volume={self.base_token_volume} " + \
             f"quote_token_volume={self.quote_token_volume}{amm_fees}>"
     
     def __str__(self) -> str:
         return f"({self.market}) High: {self.highest_price}, Low: {self.lowest_price}"
+
+
+class Candlestick:
+
+    base_transaction_volume: str
+    closing_price: str
+    highest_price: str
+    lowest_price: str
+    number_of_transactions: int
+    opening_price: str
+    quote_transaction_volume: str
+    start_time: int
+
+    def __init__(self,
+    start_time,
+    number_of_transactions,
+    opening_price,
+    closing_price,
+    highest_price,
+    lowest_price,
+    base_transaction_volume,
+    quote_transaction_volume):
+        self.base_transaction_volume = base_transaction_volume
+        self.closing_price = closing_price
+        self.highest_price = highest_price
+        self.lowest_price = lowest_price
+        self.number_of_transactions = number_of_transactions
+        self.opening_price = opening_price
+        self.quote_transaction_volume = quote_transaction_volume
+        self.start_time = start_time
+    
+    def __repr__(self) -> str:
+        # Not all attrs added - maybe add them all?
+        return f"<lowest_price='{self.lowest_price}' " + \
+            f"highest_price='{self.highest_price}' " + \
+            f"opening_price='{self.opening_price}' " + \
+            f"closing_price='{self.closing_price}' " + \
+            f"start_time={self.start_time}>"
+    
+    def __str__(self) -> str:
+        return f"High: {self.highest_price} Low: {self.lowest_price} " + \
+            f"Open: {self.opening_price} Close: {self.closing_price}"
