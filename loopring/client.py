@@ -790,6 +790,7 @@ class Client:
 
         # Filter out unused params
         payload = {k: v for k, v in payload.items() if v}
+        payload = {k: v for k, v in payload.items() if v is not None}
 
         request = Request(
             "post",
