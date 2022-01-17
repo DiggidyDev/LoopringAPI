@@ -686,7 +686,7 @@ class Client:
                         buy_token: Token,
                         client_order_id: str=None,
                         exchange: str,
-                        fill_amount_b_or_s: str,
+                        fill_amount_b_or_s: bool,
                         max_fee_bips: int,
                         order_type: str=None,
                         pool_address: str=None,
@@ -709,7 +709,7 @@ class Client:
                 order ID.
             exchange (str): The address of the exchange used to process
                 this order.
-            fill_amount_b_or_s (str): Fill the size by the `'BUY'` or `'SELL'` \
+            fill_amount_b_or_s (bool): Fill the size by the `'BUY'` (True) or `'SELL'` (False) \
                 token.
             max_fee_bips (int): Maximum order fee that the user can accept, \
                 value range (in ten thousandths) 1 ~ 63.
@@ -756,11 +756,6 @@ class Client:
             UnsupportedTokenID: ... .
         
         """
-
-        if fill_amount_b_or_s.lower() == "buy":
-            fill_amount_b_or_s = 1
-        else:
-            fill_amount_b_or_s = 0
 
         url = self.endpoint + PATH.ORDER
 

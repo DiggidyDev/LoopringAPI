@@ -13,3 +13,10 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - I have yet to start on the websocket API!
 
 # [API Reference](https://diggydev.co.uk/loopring/index.html) being updated almost daily!
+
+## Honourable mentions:
+
+A big, big thank you to the following people:
+
+- BanthaFupa: Helping to test the different endpoints!
+- Taranasus: His [LoopringSharp](https://github.com/taranasus/LoopringSharp) package gave me the little boost of motivation to get started on this API wrapper!
