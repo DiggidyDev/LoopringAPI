@@ -1,6 +1,7 @@
 from typing import Any
 
-from loopring.util.helpers import to_snake_case
+from .util.helpers import to_snake_case
+from .util.mappings import Mappings
 
 
 class GasAmount:
@@ -45,6 +46,34 @@ class OrderAmount:
     def __repr__(self) -> str:
         return f"<dust='{self.dust}' maximum='{self.maximum}' " + \
             f"minimum='{self.minimum}'>"
+
+
+class Price:
+    """A Price model.
+    
+    Note:
+        You may want to refer to the `updated_at` attribute, as the price
+        may be delayed and not reflect the current live price.
+
+    """
+
+    currency: str
+    price: str
+    symbol: str
+    updated_at: int
+
+    def __init__(self, *, currency: str, **data):
+        self.currency = currency
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<price='{self.price}' currency='{self.currency}' " + \
+            f"symbol='{self.symbol}' updated_at={self.updated_at}>"
+    
+    def __str__(self) -> str:
+        return f"1 {self.symbol} = {Mappings.CURRENCY_MAPPINGS[self.currency]}" + \
+            f"{self.price}"
 
 
 class Token:
