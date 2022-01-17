@@ -13,6 +13,15 @@ class Mappings:
 
     """
 
+    CURRENCY_MAPPINGS = {
+        "CNY": "¥",
+        "EUR": "€",
+        "GBP": "£",
+        "HKD": "HK$",
+        "JPY": "¥",
+        "USD": "$"
+    }
+
     ERROR_MAPPINGS = {
         ERR.EMPTY_API_KEY: EmptyAPIKey,
         ERR.EMPTY_ORDERHASH: EmptyOrderhash,
