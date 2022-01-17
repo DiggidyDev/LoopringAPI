@@ -1,4 +1,4 @@
-from typing import Any, List, Union
+from typing import Any, Dict, List
 from .util.helpers import to_snake_case
 
 
@@ -99,7 +99,7 @@ class PartialOrder:
         return len(self.__json) < 2
 
     @property
-    def json(self) -> dict[str, Union[str, dict[str, Union[str, int]]]]:
+    def json(self) -> Dict:
         """Returns the original data from which the object was initialised.
 
         Disabling :obj:`~loopring.client.Client.handle_errors` will prevent
