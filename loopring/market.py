@@ -1,3 +1,4 @@
+import re
 from .util.helpers import to_snake_case
 
 
@@ -90,6 +91,45 @@ class Ticker:
     
     def __str__(self) -> str:
         return f"({self.market}) High: {self.highest_price}, Low: {self.lowest_price}"
+
+
+class Trade:
+
+    action: str  # Rename to `direction`?
+    fees: str
+    market: str
+    price: str
+    record_id: str
+    trade_time: int
+    volume: str
+
+    def __init__(self,
+        trade_time,
+        record_id,
+        action,
+        volume,
+        price,
+        market,
+        fees):
+        self.action = action
+        self.fees = fees
+        self.market = market
+        self.price = price
+        self.record_id = record_id
+        self.trade_time = trade_time
+        self.volume = volume
+
+    def __repr__(self) -> str:
+        return f"<action='{self.action.title()}' market='{self.market}' " + \
+            f"price='{self.price}' trade_time={self.trade_time} " + \
+            f"volume='{self.volume}' record_id='{self.record_id}' " + \
+            f"fees='{self.fees}'>"
+    
+    def __str__(self) -> str:
+        # Add volume
+        return f"{self.action.title()} {self.market} @ {self.price}"
+
+        
 
 
 class Candlestick:
