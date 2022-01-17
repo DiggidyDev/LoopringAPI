@@ -9,7 +9,7 @@ from .errors import *
 from .exchange import Exchange
 from .market import Candlestick, Market, Ticker
 from .order import Order, OrderBook, PartialOrder
-from .token import Token, TokenConfig
+from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
@@ -243,6 +243,42 @@ class Client:
             
             return exchange
 
+    async def get_fiat_prices(self, currency: str="USD") -> List[Price]:
+        """Fetches fiat prices for all tokens supported on Loopring.
+
+        Args:
+            currency (str): All supported values: "`USD`", "`CNY`", "`JPY`", 
+            "`EUR`", "`GBP`", "`HKD`". Defaults to "`USD`".
+        
+        Returns:
+            List[:obj:`~loopring.token.Price`]: ... .
+
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.PRICE
+
+        params = {
+            "legal": currency
+        }
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            prices = []
+
+            for p in content["prices"]:
+                prices.append(Price(currency=currency, **p))
+            
+            return prices
+
     async def get_market_candlestick(self,
         market: str="LRC-ETH",
         interval:str="5min",
@@ -262,6 +298,9 @@ class Client:
             limit (int): Number of datapoints - if more are available, only
                 the first limit data points will be returned.
         
+        Returns:
+            List[:obj:`~loopring.market.Candlestick`]: ... .
+
         Raises:
             InvalidArguments: ...
             UnknownError: ...

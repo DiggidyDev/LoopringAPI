@@ -110,6 +110,7 @@ class Paths(str, Enum):
     MARKETS = "/api/v3/exchange/markets"
     ORDER = "/api/v3/order"
     ORDERS = "/api/v3/orders"
+    PRICE = "/api/v3/price"
     RELAYER_CURRENT_TIME = "/api/v3/timestamp"
     STORAGE_ID = "/api/v3/storageId"
     TICKER = "/api/v3/ticker"
