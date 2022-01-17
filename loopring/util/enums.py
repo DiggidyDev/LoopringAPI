@@ -115,6 +115,7 @@ class Paths(str, Enum):
     STORAGE_ID = "/api/v3/storageId"
     TICKER = "/api/v3/ticker"
     TOKENS = "/api/v3/exchange/tokens"
+    TRADE = "/api/v3/trade"
 
 
 class IntSig(IntEnum):

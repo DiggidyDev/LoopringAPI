@@ -7,7 +7,7 @@ import aiohttp
 
 from .errors import *
 from .exchange import Exchange
-from .market import Candlestick, Market, Ticker
+from .market import Candlestick, Market, Ticker, Trade
 from .order import Order, OrderBook, PartialOrder
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
@@ -610,6 +610,50 @@ class Client:
             order: Order = Order(**content)
 
             return order
+
+    async def get_recent_market_trades(self,
+        market: str="LRC-ETH",
+        *,
+        limit: int=20,
+        fill_types: str=None) -> List[Trade]:
+        """Get trades of a specific trading pair.
+
+        Args:
+            market (str): Defaults to "`LRC-ETH`".
+            limit (int): Defaults to 20.
+            fill_types (str): ... .
+        
+        Returns:
+            List[:obj:`~loopring.market.Trade`]: ... .
+        
+        Raises:
+            UnknownError: ...
+
+        """
+        url = self.endpoint + PATH.TRADE
+
+        params = {
+            "fillTypes": fill_types,
+            "limit": limit,
+            "market": market
+        }
+
+        params = {k: v for k, v in params.items() if v}
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            trades = []
+
+            for t in content["trades"]:
+                trades.append(Trade(*t))
+            
+            return trades
 
     # @ratelimit(5, 1)  # Work in progress
     async def get_relayer_timestamp(self) -> int:
