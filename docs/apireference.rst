@@ -15,6 +15,9 @@ with Loopring's API.
 .. warning:: This API wrapper is still work in progress, and doesn't
    currently support everything documented in the `Official API`_ docs.
 
+   NOT READY FOR USE YET!
+   Any testing done is to be done at your own discretion.
+
    If you run into something broken, please submit an `issue`_
    so I can be notified of it and fix it ASAP :^)
 
@@ -32,7 +35,7 @@ Market
 ------
 .. autoclass:: loopring.market.Market
    :members:
-   
+
 
 Order
 -----
@@ -52,6 +55,12 @@ Validity
 Volume
 ~~~~~~
 .. autoclass:: loopring.order.Volume
+   :members:
+
+
+Price
+-----
+.. autoclass:: loopring.token.Price
    :members:
 
 
