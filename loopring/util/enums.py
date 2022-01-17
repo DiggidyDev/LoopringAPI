@@ -104,6 +104,7 @@ class ErrorCodes(IntEnum):
 class Paths(str, Enum):
 
     API_KEY = "/api/v3/apiKey"
+    CANDLESTICK = "/api/v3/candlestick"
     DEPTH = "/api/v3/depth"
     EXCHANGES = "/api/v3/exchange/info"
     MARKETS = "/api/v3/exchange/markets"

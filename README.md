@@ -7,7 +7,8 @@ Whether this is in the form of a spelling mistake, a redesign of a class, or a n
 
 I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of the wrapper first.
 
-# PROGRESS: 13/38 REST API Endpoints done!
+# PROGRESS: 14/38 REST API Endpoints done!
+
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
 - I have yet to start on the websocket API!
 
