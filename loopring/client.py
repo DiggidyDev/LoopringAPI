@@ -29,6 +29,10 @@ from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
 #       `OrderNotFound` could also be used when there isn't an order to cancel...
 
 
+# TODO: UpdateAccountEDDSAKey endpoint (need keySeed? from account query)
+
+
+
 class Client:
     """The main class interacting with Loopring's API endpoints.
 
