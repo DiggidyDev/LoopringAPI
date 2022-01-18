@@ -8,6 +8,7 @@ import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
+from .account import Account
 from .errors import *
 from .exchange import Exchange
 from .market import Candlestick, Market, Ticker, Trade
@@ -46,6 +47,7 @@ class Client:
     """
 
     account_id: int
+    address: str
     api_key: str
     endpoint: ENDPOINT
     handle_errors: bool
@@ -58,6 +60,7 @@ class Client:
                 api_key: str=None,
                 endpoint: ENDPOINT=None,
                 *,
+                address: str=None,
                 handle_errors: bool=True,
                 private_key: str=None,
                 publicX: str=None,
@@ -175,6 +178,40 @@ class Client:
 
         if not self._session.closed:
             await self._session.close()
+
+    async def get_account_info(self, address: str) -> Account:
+        """Returns data associated with the user's exchange account.
+        
+        Args:
+            address (str): ... .
+        
+        Returns:
+            :obj:`~loopring.account.Account`: ... .
+        
+        Raises:
+            AddressNotFound: ... .
+            UnknownError: ... .
+            UserNotFound: ... .
+
+        """
+
+        url = self.endpoint + PATH.ACCOUNT
+
+        params = {
+            "owner": address
+        }
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            account = Account(**content)
+
+            return account
 
     async def get_api_key(self) -> str:
         """Get the API Key associated with an account.

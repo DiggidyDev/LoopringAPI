@@ -23,6 +23,8 @@ class Mappings:
     }
 
     ERROR_MAPPINGS = {
+        ERR.ADDRESS_NOT_FOUND: AddressNotFound,
+
         ERR.EMPTY_API_KEY: EmptyAPIKey,
         ERR.EMPTY_ORDERHASH: EmptyOrderhash,
         ERR.EMPTY_SIG: EmptySignature,
@@ -39,6 +41,7 @@ class Mappings:
         ERR.INVALID_NONCE: InvalidNonce,
         ERR.INVALID_ORDER: InvalidOrder,
         ERR.INVALID_ORDER_ID: InvalidOrderID,
+        ERR.INVALID_QUERY_STRING: InvalidQueryString,
         ERR.INVALID_RATE: InvalidRate,
         ERR.INVALID_SIG: InvalidSignature,
         ERR.INVALID_TRANSFER_RECEIVER: InvalidTransferReceiver,

@@ -127,6 +127,14 @@ class InvalidOrderID(LoopringError):
         super().__init__(message)
 
 
+class InvalidQueryString(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Invalid account query string."
+        super().__init__(message)
+
+
 class InvalidRate(LoopringError):
 
     def __init__(self, message: str=None):

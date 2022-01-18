@@ -40,6 +40,7 @@ class ErrorCodes(IntEnum):
 
     # User querying
     ADDRESS_NOT_FOUND = 101001
+    INVALID_QUERY_STRING = 104007
     USER_NOT_FOUND = 101002
 
     # Orders
@@ -104,6 +105,7 @@ class ErrorCodes(IntEnum):
 class Paths(str, Enum):
     """All paths available on the API."""
 
+    ACCOUNT = "/api/v3/account"
     API_KEY = "/api/v3/apiKey"
     CANDLESTICK = "/api/v3/candlestick"
     DEPTH = "/api/v3/depth"
