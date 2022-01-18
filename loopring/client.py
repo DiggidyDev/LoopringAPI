@@ -143,7 +143,7 @@ class Client:
         }
 
         # Filter out unused params
-        params = {k: v for k, v in params.items() if v}
+        params = {k: v for k, v in params.items() if v is not None}
 
         req = Request("delete", self.endpoint, PATH.ORDER, params=params)
 
@@ -317,7 +317,7 @@ class Client:
             "limit": limit
         }
 
-        params = {k: v for k, v in params.items() if v}
+        params = {k: v for k, v in params.items() if v is not None}
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
@@ -505,7 +505,7 @@ class Client:
         }
 
         # Filter out unspecified parameters
-        params = {k: v for k, v in params.items() if v}
+        params = {k: v for k, v in params.items() if v is not None}
 
         print(params)
 
@@ -638,7 +638,7 @@ class Client:
             "market": market
         }
 
-        params = {k: v for k, v in params.items() if v}
+        params = {k: v for k, v in params.items() if v is not None}
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
@@ -682,7 +682,7 @@ class Client:
     async def submit_order(self,
                         *,
                         affiliate: str=None,
-                        all_or_none: str,
+                        all_or_none: str=False,
                         buy_token: Token,
                         client_order_id: str=None,
                         exchange: str,
@@ -702,7 +702,7 @@ class Client:
             affiliate (str): An account ID to receive a share of the
                 order's fee.
             all_or_none (str): Whether the order supports partial fills
-                or not. Currently only supports `'false'`.
+                or not. Currently only supports `False`, no need to provide this arg.
             buy_token (:obj:`~loopring.token.Token`): Wrapper object used \
                 to describe a token associated with a certain quantity.
             client_order_id (str): An arbitrary, unique client-side
@@ -762,7 +762,7 @@ class Client:
         payload = {
             "accountId": self.account_id,
             "affiliate": affiliate,
-            "allOrNone": all_or_none,
+            "allOrNone": False,  # all_or_none,
             "buyToken": {
                 "tokenId": buy_token.id,
                 "volume": buy_token.volume
@@ -784,7 +784,6 @@ class Client:
         }
 
         # Filter out unused params
-        payload = {k: v for k, v in payload.items() if v}
         payload = {k: v for k, v in payload.items() if v is not None}
 
         request = Request(
