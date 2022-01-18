@@ -57,7 +57,11 @@ def raise_errors_in(content: dict) -> None:
             # even though the docs only mention 'msg'...
             message = result.get("msg") or result.get("message")
 
-            raise Mappings.ERROR_MAPPINGS[error_occured](message)
+            try:
+                raise Mappings.ERROR_MAPPINGS[error_occured](message)
+            except KeyError:
+                raise KeyError(f"{error_occured} not registered in 'enums.py'. " + \
+                f"'{message}'.")
 
 
 def ratelimit(rate: int, per: int) -> Callable:
