@@ -96,6 +96,8 @@ class Ticker:
 class Trade:
 
     action: str  # Rename to `direction`?
+    block_id: int
+    block_num: int
     fees: str
     market: str
     price: str
@@ -110,8 +112,12 @@ class Trade:
         volume,
         price,
         market,
-        fees):
+        fees,
+        block_id=None,
+        block_num=None):
         self.action = action
+        self.block_id = int(block_id)
+        self.block_num = int(block_num)
         self.fees = fees
         self.market = market
         self.price = price
@@ -120,10 +126,12 @@ class Trade:
         self.volume = volume
 
     def __repr__(self) -> str:
+        if self.block_id is not None:
+            block_info = f" block_id={self.block_id} block_num={self.block_num}"
         return f"<action='{self.action.title()}' market='{self.market}' " + \
             f"price='{self.price}' trade_time={self.trade_time} " + \
             f"volume='{self.volume}' record_id='{self.record_id}' " + \
-            f"fees='{self.fees}'>"
+            f"fees='{self.fees}'{block_info}>"
     
     def __str__(self) -> str:
         # Add volume
