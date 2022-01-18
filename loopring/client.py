@@ -524,7 +524,7 @@ class Client:
 
             return orders
 
-    async def get_next_storage_id(self, sell_token_id: int=None) -> dict:
+    async def get_next_storage_id(self, sell_token_id: Union[int, Token]=None) -> dict:
         """Get the next storage ID.
 
         Fetches the next order ID for a given sold token. If the need
@@ -554,6 +554,9 @@ class Client:
 
         if not sell_token_id:
             raise InvalidArguments("Missing 'sellTokenID' argument.")
+
+        if isinstance(sell_token_id, Token):
+            sell_token_id = Token.id
 
         url = self.endpoint + PATH.STORAGE_ID
         headers = {
