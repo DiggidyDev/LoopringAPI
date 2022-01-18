@@ -120,6 +120,7 @@ class Paths(str, Enum):
     TOKENS = "/api/v3/exchange/tokens"
     TRADE = "/api/v3/trade"
     TRANSFER = "/api/v3/transfer"
+    USER_REGISTRATION = "/api/v3/user/createInfo"
 
 
 class IntSig(IntEnum):

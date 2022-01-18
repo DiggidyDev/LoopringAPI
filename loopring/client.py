@@ -12,7 +12,9 @@ from .account import Account
 from .errors import *
 from .exchange import Exchange
 from .market import Candlestick, Market, Ticker, Trade
-from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
+from .order import (
+    CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer, TransactionHashData
+)
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
@@ -992,6 +994,64 @@ class Client:
                 token_confs.append(TokenConfig(**t))
             
             return token_confs
+
+    async def get_user_registration_transactions(self,
+        *,
+        end: int=None,
+        limit: int=None,
+        offset: int=None,
+        start: int=None,
+        status: str=None) -> List[TransactionHashData]:
+        """Return all ethereum transactions from a user upon account registration.
+        
+        Args:
+            end (int): ... .
+            limit (int): ... .
+            offset (int): ... .
+            start (int): ... .
+            status (str): ... .
+        
+        Returns:
+            List[:obj:`~loopring.order.TransactionHashData`]: ... .
+        
+        Raises:
+            EmptyAPIKey: ... .
+            EmptyUser: ... .
+            InvalidAccountID: ... .
+            InvalidAPIKey: ... .
+            UnknownError: ... .
+
+        """
+        url = self.endpoint + PATH.USER_REGISTRATION
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": self.account_id,
+            "end": end,
+            "limit": limit,
+            "offset": offset,
+            "start": start,
+            "status": status
+        }
+
+        params = clean_params(params)
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            tx_list = []
+
+            for tx in content["transactions"]:
+                tx_list.append(TransactionHashData(**tx))
+
+            return tx_list
 
     # TODO: rename to `regenerate_api_key()`?
     async def update_api_key(self) -> str:
