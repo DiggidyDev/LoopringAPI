@@ -150,14 +150,11 @@ class Client:
         """
 
         url = self.endpoint + PATH.ORDER
-        params = {
+        params = clean_params({
             "accountId": self.account_id,
             "clientOrderId": client_order_id,
             "orderHash": orderhash
-        }
-
-        # Filter out unused params
-        params = clean_params(params)
+        })
 
         req = Request("delete", self.endpoint, PATH.ORDER, params=params)
 
@@ -357,15 +354,13 @@ class Client:
 
         url = self.endpoint + PATH.CANDLESTICK
 
-        params = {
+        params = clean_params({
             "market": market,
             "interval": interval,
             "start": start,
             "end": end,
             "limit": limit
-        }
-
-        params = clean_params(params)
+        })
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
@@ -539,7 +534,7 @@ class Client:
         headers = {
             "X-API-KEY": self.api_key
         }
-        params = {
+        params = clean_params({
             "accountId": self.account_id,
             "end": end,
             "limit": limit,
@@ -550,12 +545,7 @@ class Client:
             "start": start,
             "status": status,
             "tradeChannels": trade_channels
-        }
-
-        # Filter out unspecified parameters
-        params = clean_params(params)
-
-        print(params)
+        })
 
         async with self._session.get(url, headers=headers, params=params) as r:
             raw_content = await r.read()
@@ -673,7 +663,7 @@ class Client:
             market (str): Defaults to "`LRC-ETH`".
             limit (int): Defaults to 20.
             fill_types (str): ... .
-        
+
         Returns:
             List[:obj:`~loopring.market.Trade`]: ... .
         
@@ -683,13 +673,11 @@ class Client:
         """
         url = self.endpoint + PATH.TRADE
 
-        params = {
+        params = clean_params({
             "fillTypes": fill_types,
             "limit": limit,
             "market": market
-        }
-
-        params = clean_params(params)
+        })
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
@@ -994,13 +982,13 @@ class Client:
             token_confs = []
 
             for t in content:
-                print(t, type(t))
                 token_confs.append(TokenConfig(**t))
             
             return token_confs
 
     async def get_user_registration_transactions(self,
         *,
+        account_id: int=None,
         end: int=None,
         limit: int=None,
         offset: int=None,
@@ -1009,6 +997,8 @@ class Client:
         """Return all ethereum transactions from a user upon account registration.
         
         Args:
+            account_id (int): Leave blank to receive your client config account's
+                transactions.
             end (int): ... .
             limit (int): ... .
             offset (int): ... .
@@ -1031,16 +1021,14 @@ class Client:
         headers = {
             "X-API-KEY": self.api_key
         }
-        params = {
-            "accountId": self.account_id,
+        params = clean_params({
+            "accountId": account_id or self.account_id,
             "end": end,
             "limit": limit,
             "offset": offset,
             "start": start,
             "status": status
-        }
-
-        params = clean_params(params)
+        })
 
         async with self._session.get(url, headers=headers, params=params) as r:
             raw_content = await r.read()
@@ -1056,6 +1044,47 @@ class Client:
                 tx_list.append(TransactionHashData(**tx))
 
             return tx_list
+
+    async def get_user_trade_history(self,
+        market: str="LRC-ETH",
+        *,
+        account_id: int=None,
+        fill_types: str=None,
+        from_id: int=None,
+        limit: int=None,
+        offset: int=None,
+        order_hash: str=None) -> List[Trade]:
+        """Get a user's trade history."""
+
+        url = self.endpoint + PATH.TRADE_HISTORY
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "fillTypes": fill_types,
+            "fromId": from_id,
+            "limit": limit,
+            "market": market,
+            "offset": offset,
+            "orderHash": order_hash
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            trades = []
+
+            for t in content["trades"]:
+                trades.append(Trade(*t))
+            
+            return trades
 
     # TODO: rename to `regenerate_api_key()`?
     async def update_api_key(self) -> str:

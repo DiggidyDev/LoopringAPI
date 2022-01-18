@@ -119,6 +119,7 @@ class Paths(str, Enum):
     TICKER = "/api/v3/ticker"
     TOKENS = "/api/v3/exchange/tokens"
     TRADE = "/api/v3/trade"
+    TRADE_HISTORY = "/api/v3/user/trades"
     TRANSFER = "/api/v3/transfer"
     USER_REGISTRATION = "/api/v3/user/createInfo"
 
