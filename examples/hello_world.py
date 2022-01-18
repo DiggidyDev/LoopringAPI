@@ -14,10 +14,9 @@ client = loopring.Client(handle_errors=True, config=cfg)
 
 
 async def main():
+    info = await client.get_account_info(address=client.address)
 
-    prices = await client.get_fiat_prices()
-    for p in prices:
-        print(p)
+    print(info, type(info))
 
 
 if __name__ == "__main__":
