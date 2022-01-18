@@ -1,19 +1,23 @@
 import asyncio
 import json
+import time
 from asyncio.events import AbstractEventLoop
 from typing import List, Union
 
 import aiohttp
+from py_eth_sig_utils.signing import v_r_s_to_signature
+from py_eth_sig_utils.utils import ecsign
 
 from .errors import *
 from .exchange import Exchange
 from .market import Candlestick, Market, Ticker, Trade
-from .order import Order, OrderBook, PartialOrder
+from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import raise_errors_in, ratelimit
 from .util.request import Request
+from .util.sdk.sig.ecdsa import generate_transfer_EIP712_hash
 from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
@@ -681,6 +685,111 @@ class Client:
                 raise_errors_in(content)
 
             return content["timestamp"]
+
+    async def submit_internal_transfer(self,
+        *,
+        exchange: Union[str, Exchange],
+        payer_id: int,
+        payer_address: str,
+        payee_id: int,
+        payee_address: str,
+        token: Token,
+        max_fee: Token,
+        storage_id: int,
+        valid_until: int=None,
+        counter_factual_info: CounterFactualInfo=None,
+        memo: str=None,
+        client_id: str=None) -> Transfer:
+        """Submit an internal transfer.
+        
+        Args:
+            client_id (str): ... .
+            counter_factual_info (:obj:`~loopring.order.CounterFactualInfo`): ... .
+            exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): ... .
+            max_fee (:obj:`~loopring.token.Token`): ... .
+            memo (str): ... .
+            payee_address (str): ... .
+            payee_id (int): ... .
+            payer_address (str): ... .
+            payer_id (int): ... .
+            storage_id (int): ... .
+            token (:obj:`~loopring.token.Token`): ... .
+            valid_until (int): ... .
+        
+        Returns:
+            :obj:`~loopring.order.Transfer`: ... .
+        
+        Raises:
+            InvalidArguments: ... .
+            InvalidExchangeID: ... .
+            InvalidNonce: ... .
+            InvalidTransferReceiver: ... .
+            InvalidTransferSender: ... .
+            UnknownError: ... .
+            UnsupportedFeeToken: ... .
+
+        """
+
+        if isinstance(exchange, Exchange):
+            exchange = str(exchange)
+        
+        if valid_until is not None:
+            # Default to 2 months:
+            # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
+            # for information about order validity and time
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+
+        url = self.endpoint + PATH.TRANSFER
+
+        # For some reason, ECDSASig and EDDSASig aren't
+        # required parameters in the payload...
+        # Need to look into this...
+        payload = {
+            "clientId": client_id,
+            "counterFactualInfo": counter_factual_info,
+            "exchange": exchange,
+            "maxFee": max_fee,
+            "memo": memo,
+            "payeeAddr": payee_address,
+            "payeeId": payee_id,
+            "payerAddr": payer_address,
+            "payerId": payer_id,
+            "storageId": storage_id,
+            "token": {
+                "tokenId": token.id,
+                "volume": token.volume
+            },
+            "validUntil": valid_until
+        }
+
+        payload = {k: v for k, v in payload.items() if v is not None}
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.TRANSFER,
+            payload=payload
+        )
+
+        message = generate_transfer_EIP712_hash(request.payload)
+        v, r, s = ecsign(message, self.private_key)
+
+        x_api_sig = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"  # EIP_712
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": x_api_sig 
+        }
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            return Transfer(**content)
 
     async def submit_order(self,
                         *,

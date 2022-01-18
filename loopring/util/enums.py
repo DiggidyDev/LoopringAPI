@@ -102,6 +102,7 @@ class ErrorCodes(IntEnum):
 
 
 class Paths(str, Enum):
+    """All paths available on the API."""
 
     API_KEY = "/api/v3/apiKey"
     CANDLESTICK = "/api/v3/candlestick"
@@ -116,6 +117,7 @@ class Paths(str, Enum):
     TICKER = "/api/v3/ticker"
     TOKENS = "/api/v3/exchange/tokens"
     TRADE = "/api/v3/trade"
+    TRANSFER = "/api/v3/transfer"
 
 
 class IntSig(IntEnum):

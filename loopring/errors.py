@@ -63,6 +63,14 @@ class FailedToSubmit(LoopringError):
         super().__init__(message)
 
 
+class InconsistentTokens(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Transfer token inconsistent with fee token."
+        super().__init__(message)
+
+
 class InvalidAccountID(LoopringError):
 
     def __init__(self, message: str=None):
@@ -132,6 +140,22 @@ class InvalidSignature(LoopringError):
     def __init__(self, message: str=None):
         if not message:
             message = "Incorrect signature supplied."
+        super().__init__(message)
+
+
+class InvalidTransferReceiver(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Transfer receiver is invalid."  # Invalid address presumably
+        super().__init__(message)
+
+
+class InvalidTransferSender(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Transfer sender is invalid."  # Invalid address presumably
         super().__init__(message)
 
 
@@ -244,6 +268,14 @@ class UnsupportedDepthLevel(LoopringError):
     def __init__(self, message: str=None):
         if not message:
             message = "Unsupported depth level."
+        super().__init__(message)
+
+
+class UnsupportedFeeToken(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Unsupported fee token."
         super().__init__(message)
 
 

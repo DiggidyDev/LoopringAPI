@@ -3,6 +3,21 @@ from .util.helpers import to_snake_case
 
 
 
+class CounterFactualInfo:
+    """...
+    
+    .. warning:: This isn't yet implemented
+
+    """
+
+    wallet_factory: str
+    wallet_owner: str
+    wallet_salt: str
+
+    def __init__(self):
+        pass
+
+
 class Validity:
     """A class representative of an order's validity.
     
@@ -51,7 +66,26 @@ class Volume:
             f"quote_amount='{self.quote_amount}' quote_filled='{self.quote_filled}'>"
 
 
-class PartialOrder:
+class Transfer:
+
+    hash: str
+    is_idempotent: bool
+    status: str
+
+    def __init__(self, **data) -> None:
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<hash='{self.hash}' is_idempotent={self.is_idempotent} " + \
+            f"status='{self.status}'>"
+    
+    def __str__(self) -> str:
+        return self.hash
+
+
+
+class PartialOrder(Transfer):
     """A partial order object, usually returned when making a new order.
     
     Attributes:
@@ -72,6 +106,8 @@ class PartialOrder:
 
         if self._is_error(data):
             return
+
+        super().__init__(**data)
 
         for k in data.keys():
             setattr(self, to_snake_case(k), data[k])

@@ -31,6 +31,7 @@ class Mappings:
         ERR.FAILED_TO_FREEZE_AMOUNT: FailedToFreeze,
         ERR.FAILED_TO_SUBMIT_ORDER: FailedToSubmit,
 
+        ERR.INCONSISTENT_TRANSFER_TOKEN_FEE_TOKEN: InconsistentTokens,
         ERR.INVALID_ACCOUNT_ID: InvalidAccountID,
         ERR.INVALID_API_KEY: InvalidAPIKey,
         ERR.INVALID_ARGUMENTS: InvalidArguments,
@@ -40,6 +41,8 @@ class Mappings:
         ERR.INVALID_ORDER_ID: InvalidOrderID,
         ERR.INVALID_RATE: InvalidRate,
         ERR.INVALID_SIG: InvalidSignature,
+        ERR.INVALID_TRANSFER_RECEIVER: InvalidTransferReceiver,
+        ERR.INVALID_TRANSFER_SENDER: InvalidTransferSender,
         ERR.INVALID_USER_BALANCE: InvalidUserBalance,
 
         ERR.NO_ORDER_TO_CANCEL: NoOrderToCancel,
@@ -56,6 +59,7 @@ class Mappings:
 
         ERR.UNKNOWN_ERROR: UnknownError,
         ERR.UNSUPPORTED_DEPTH_LEVEL: UnsupportedDepthLevel,
+        ERR.UNSUPPORTED_FEE_TOKEN: UnsupportedFeeToken,
         ERR.UNSUPPORTED_TOKEN_ID: UnsupportedTokenID,
         ERR.USER_NOT_FOUND: UserNotFound
     }
