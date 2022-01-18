@@ -7,7 +7,7 @@ Whether this is in the form of a spelling mistake, a redesign of a class, or a n
 
 I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of the wrapper first.
 
-# PROGRESS: 18/38 REST API Endpoints done!
+# PROGRESS: 19/38 REST API Endpoints done!
 
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
 - I have yet to start on the websocket API!
@@ -16,6 +16,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 
 # TODO:
 
+- [ ] Figure out why `keySeed` isn't being returned from the account query endpoint.
 - [ ] Finish off REST API endpoints.
 - [ ] Start and finish the websocket API.
 - [ ] Support datetime objects for timestamps.
