@@ -5,6 +5,27 @@ from aiolimiter import AsyncLimiter
 from ..util.mappings import Mappings
 
 
+def clean_params(params: dict) -> dict:
+    """Clean all NoneType parameters from a given dict.
+    
+    The API doesn't always require all the possible parameters to be passed
+    to it when making a request, so this helper function should help to
+    remove any paramaters that won't be needed.
+
+    Note:
+        This will only remove all values whose object evaluation returns True
+        for `None`. In other words, all 
+        [falsy](https://stackoverflow.com/a/39984051/7808223) values other than
+        `None` will remain.
+
+    Returns:
+        dict: A clean parameter dictionary, removing all pairs with `None` values.
+
+    """
+
+    return {k: v for k, v in params.items() if v is not None}
+
+
 def raise_errors_in(content: dict) -> None:
     """Raise the appropriate error from an API response.
     

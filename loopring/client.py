@@ -16,7 +16,7 @@ from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
-from .util.helpers import raise_errors_in, ratelimit
+from .util.helpers import clean_params, raise_errors_in, ratelimit
 from .util.request import Request
 from .util.sdk.sig.ecdsa import generate_transfer_EIP712_hash
 from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
@@ -151,7 +151,7 @@ class Client:
         }
 
         # Filter out unused params
-        params = {k: v for k, v in params.items() if v is not None}
+        params = clean_params(params)
 
         req = Request("delete", self.endpoint, PATH.ORDER, params=params)
 
@@ -359,7 +359,7 @@ class Client:
             "limit": limit
         }
 
-        params = {k: v for k, v in params.items() if v is not None}
+        params = clean_params(params)
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
@@ -547,7 +547,7 @@ class Client:
         }
 
         # Filter out unspecified parameters
-        params = {k: v for k, v in params.items() if v is not None}
+        params = clean_params(params)
 
         print(params)
 
@@ -683,7 +683,7 @@ class Client:
             "market": market
         }
 
-        params = {k: v for k, v in params.items() if v is not None}
+        params = clean_params(params)
 
         async with self._session.get(url, params=params) as r:
             raw_content = await r.read()
