@@ -1054,7 +1054,18 @@ class Client:
         limit: int=None,
         offset: int=None,
         order_hash: str=None) -> List[Trade]:
-        """Get a user's trade history."""
+        """Get a user's trade history.
+        
+        Args:
+            account_id (int): ... .
+            fill_types (str): Supports '`dex`' and '`amm`'.
+            from_id (int): ... .
+            limit (int): ... .
+            market (str): Defaults to '`LRC-ETH`'.
+            offset (int): ... .
+            order_hash (str): ... .
+
+        """
 
         url = self.endpoint + PATH.TRADE_HISTORY
 
