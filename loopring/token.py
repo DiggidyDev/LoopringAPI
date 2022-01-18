@@ -81,7 +81,7 @@ class Token:
     
     Args:
         id (int): ...
-        volume (str): ...
+        volume (int): ...
 
     """
 
@@ -145,12 +145,12 @@ class TokenConfig:
     def __repr__(self) -> str:
         return f"<symbol='{self.symbol}' name='{self.name}' " + \
             f"token_id={self.token_id} type='{self.type}' " + \
-            f"address='{self.address}' enabled={self.enabled}" + \
+            f"address='{self.address}' enabled={self.enabled} " + \
             f"decimals={self.decimals} precision={self.precision} " + \
             f"precision_for_order={self.precision_for_order} " + \
             f"fast_withdraw_limit='{self.fast_withdraw_limit}' " + \
             f"lucky_token_amounts={repr(self.lucky_token_amounts)} " + \
-            f"order_amounts={repr(self.order_amounts)}" + \
+            f"order_amounts={repr(self.order_amounts)} " + \
             f"gas_amounts={repr(self.gas_amounts)}>"
     
     def __str__(self) -> str:

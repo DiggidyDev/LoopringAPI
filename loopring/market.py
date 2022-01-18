@@ -63,14 +63,14 @@ class Ticker:
         base_fee_amount=None,
         quote_fee_amount=None):
         self.market             = market or "N/A"
-        self.timestamp          = timestamp or "N/A"
-        self.base_token_volume  = base_token_volume or "N/A"
-        self.quote_token_volume = quote_token_volume or "N/A"
+        self.timestamp          = int(timestamp) or "N/A"
+        self.base_token_volume  = int(base_token_volume) or "N/A"
+        self.quote_token_volume = int(quote_token_volume) or "N/A"
         self.opening_price      = opening_price or "N/A"
         self.highest_price      = highest_price or "N/A"
         self.lowest_price       = lowest_price or "N/A"
         self.closing_price      = closing_price or "N/A"
-        self.number_of_trades   = number_of_trades or "N/A"
+        self.number_of_trades   = int(number_of_trades) or "N/A"
         self.highest_bid        = highest_bid or "N/A"
         self.lowest_ask         = lowest_ask or "N/A"
         self.base_fee_amount    = base_fee_amount or "N/A"
@@ -103,7 +103,7 @@ class Trade:
     price: str
     record_id: str
     trade_time: int
-    volume: str
+    volume: int
 
     def __init__(self,
         trade_time,
@@ -122,8 +122,8 @@ class Trade:
         self.market = market
         self.price = price
         self.record_id = record_id
-        self.trade_time = trade_time
-        self.volume = volume
+        self.trade_time = int(trade_time)
+        self.volume = int(volume)
 
     def __repr__(self) -> str:
         if self.block_id is not None:
@@ -135,20 +135,18 @@ class Trade:
     
     def __str__(self) -> str:
         # Add volume
-        return f"{self.action.title()} {self.market} @ {self.price}"
-
-        
+        return f"{self.action.title()} {self.market} @ {self.price}"  
 
 
 class Candlestick:
 
-    base_transaction_volume: str
+    base_transaction_volume: int
     closing_price: str
     highest_price: str
     lowest_price: str
     number_of_transactions: int
     opening_price: str
-    quote_transaction_volume: str
+    quote_transaction_volume: int
     start_time: int
 
     def __init__(self,
@@ -160,14 +158,14 @@ class Candlestick:
     lowest_price,
     base_transaction_volume,
     quote_transaction_volume):
-        self.base_transaction_volume = base_transaction_volume
+        self.base_transaction_volume = int(base_transaction_volume)
         self.closing_price = closing_price
         self.highest_price = highest_price
         self.lowest_price = lowest_price
-        self.number_of_transactions = number_of_transactions
+        self.number_of_transactions = int(number_of_transactions)
         self.opening_price = opening_price
-        self.quote_transaction_volume = quote_transaction_volume
-        self.start_time = start_time
+        self.quote_transaction_volume = int(quote_transaction_volume)
+        self.start_time = int(start_time)
     
     def __repr__(self) -> str:
         # Not all attrs added - maybe add them all?
