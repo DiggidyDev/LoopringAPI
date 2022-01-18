@@ -89,12 +89,13 @@ class Client:
         if not (cfg.get("publicY") or publicY):
             raise InvalidArguments("Missing publicY from config.")
 
-        self.account_id  = cfg.get("account_id")  or account_id
-        self.api_key     = cfg.get("api_key")     or api_key
-        self.endpoint    = cfg.get("endpoint")    or endpoint
-        self.private_key = cfg.get("private_key") or private_key
-        self.publicX     = cfg.get("publicX")     or publicX
-        self.publicY     = cfg.get("publicY")     or publicY
+        self.account_id  = cfg.get("account_id", account_id)
+        self.address     = cfg.get("address", address)
+        self.api_key     = cfg.get("api_key", api_key)
+        self.endpoint    = cfg.get("endpoint", endpoint)
+        self.private_key = cfg.get("private_key", private_key)
+        self.publicX     = cfg.get("publicX", publicX)
+        self.publicY     = cfg.get("publicY", publicY)
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
