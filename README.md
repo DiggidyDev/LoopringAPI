@@ -14,6 +14,16 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 
 # [API Reference](https://diggydev.co.uk/loopring/index.html) being updated almost daily!
 
+# TODO:
+
+- [ ] Finish off REST API endpoints.
+- [ ] Start and finish the websocket API.
+- [ ] Support datetime objects for timestamps.
+- [ ] Make some sense out of [how storage IDs work](https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#storage).
+- [ ] Load in client config/account export from a file instead of pasting it directly into a python script.
+- [ ] Finish documentation for all the endpoints.
+- [ ] Add loads of examples!
+
 ## Honourable mentions:
 
 A big, big thank you to the following people:
