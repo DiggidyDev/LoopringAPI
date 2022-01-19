@@ -123,7 +123,8 @@ class Paths(str, Enum):
     TRADE = "/api/v3/trade"
     TRADE_HISTORY = "/api/v3/user/trades"
     TRANSFER = "/api/v3/transfer"
-    USER_BALANCES  ="/api/v3/user/balances"
+    USER_BALANCES = "/api/v3/user/balances"
+    USER_DEPOSITS = "/api/v3/user/deposits"
     USER_REGISTRATION = "/api/v3/user/createInfo"
     USER_PASSWORD_RESETS = "/api/v3/user/updateInfo"
 

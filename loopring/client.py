@@ -11,7 +11,7 @@ from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
 from .errors import *
-from .exchange import Exchange, TransactionHashData
+from .exchange import DepositHashData, Exchange, TransactionHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Price, Token, TokenConfig
@@ -810,6 +810,74 @@ class Client:
                 token_confs.append(TokenConfig(**t))
             
             return token_confs
+
+    async def get_user_deposit_history(self,
+        *,
+        account_id: int=None,
+        end: Union[int, datetime]=None,
+        hashes: Union[str, Sequence[str]]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        status: str=None,
+        token_symbol: str=None) -> List[DepositHashData]:
+        """Get a user's deposit records.
+        
+        Args:
+            account_id (int): ... .
+            end (Union[int, :class:`~datetime.datetime`]): ... .
+            hashes (Union[str, Sequence[str]]): ... .
+            limit (int): ... .
+            offset (int): ... .
+            start (Union[int, :class:`~datetime.datetime`]): ... .
+            status (str): ... .
+            token_symbol (str): ... .
+
+        Returns:
+            List[:obj:`~loopring.exchange.DepositHashData`]: ...
+        
+        Raises:
+            EmptyAPIKey: ...
+            EmptyUser: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.USER_DEPOSITS
+
+        if isinstance(hashes, (list, tuple)):
+            hashes = ",".join(hashes)
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "end": validate_timestamp(end),
+            "hashes": hashes,
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "status": status,
+            "tokenSymbol": token_symbol
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            deposits = []
+
+            for d in content["transactions"]:
+                deposits.append(DepositHashData(**d))
+            
+            return deposits
 
     async def get_user_exchange_balances(self,
         *,
