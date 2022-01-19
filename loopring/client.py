@@ -11,11 +11,9 @@ from py_eth_sig_utils.utils import ecsign
 
 from .account import Account
 from .errors import *
-from .exchange import Exchange
+from .exchange import Exchange, TransactionHashData
 from .market import Candlestick, Market, Ticker, Trade
-from .order import (
-    CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer, TransactionHashData
-)
+from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
@@ -659,6 +657,63 @@ class Client:
 
             return order
 
+    # TODO: Accept a list of str for status?
+    async def get_password_reset_transactions(self,
+        *,
+        account_id: int=None,
+        end: Union[int, datetime]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        status: str=None) -> List[TransactionHashData]:
+        """Get eth transactions from a user from password resets on the exchange.
+        
+        Args:
+            account_id (int): ... .
+            end (Union[int, :class:`~datetime.datetime`]): ... .
+            limit (int): ... .
+            offset (int): ... .
+            start (Union[int, :class:`~datetime.datetime`]): ... .
+            status (str): "`processing`", "`processed`", "`received`", "`failed`".
+        
+        Returns:
+            List[:obj:`~loopring.exchange.TransactionHashData`]: ... .
+        
+        Raises:
+            EmptyAPIKey: ... .
+            InvalidAccountID: ... .
+
+        """
+
+        url = self.endpoint + PATH.USER_PASSWORD_RESETS
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "end": validate_timestamp(end),
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "status": status
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            tx_list = []
+
+            for t in content["transactions"]:
+                tx_list.append(TransactionHashData(**t))
+            
+            return tx_list
+
     async def get_recent_market_trades(self,
         market: str="LRC-ETH",
         *,
@@ -727,6 +782,145 @@ class Client:
             dt = datetime.fromtimestamp(content["timestamp"] / 1000)
 
             return dt
+
+    async def get_token_configurations(self) -> List[TokenConfig]:
+        """Return the configs of all supporoted tokens (Ether included).
+        
+        Returns:
+            List[:obj:`~loopring.token.TokenConfig`]: Token configs.
+        
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.TOKENS
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            token_confs = []
+
+            for t in content:
+                token_confs.append(TokenConfig(**t))
+            
+            return token_confs
+
+    async def get_user_registration_transactions(self,
+        *,
+        account_id: int=None,
+        end: Union[int, datetime]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        status: str=None) -> List[TransactionHashData]:
+        """Return all ethereum transactions from a user upon account registration.
+        
+        Args:
+            account_id (int): Leave blank to receive your client config account's
+                transactions.
+            end (Union[int, :class:`~datetime.datetime`): ... .
+            limit (int): ... .
+            offset (int): ... .
+            start (Union[int, :class:`~datetime.datetime`): ... .
+            status (str): ... .
+        
+        Returns:
+            List[:obj:`~loopring.exchange.TransactionHashData`]: ... .
+        
+        Raises:
+            EmptyAPIKey: ... .
+            EmptyUser: ... .
+            InvalidAccountID: ... .
+            InvalidAPIKey: ... .
+            UnknownError: ... .
+
+        """
+        url = self.endpoint + PATH.USER_REGISTRATION
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "end": validate_timestamp(end),
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "status": status
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            tx_list = []
+
+            for tx in content["transactions"]:
+                tx_list.append(TransactionHashData(**tx))
+
+            return tx_list
+
+    async def get_user_trade_history(self,
+        market: str="LRC-ETH",
+        *,
+        account_id: int=None,
+        fill_types: str=None,
+        from_id: int=None,
+        limit: int=None,
+        offset: int=None,
+        order_hash: str=None) -> List[Trade]:
+        """Get a user's trade history.
+        
+        Args:
+            account_id (int): ... .
+            fill_types (str): Supports '`dex`' and '`amm`'.
+            from_id (int): ... .
+            limit (int): ... .
+            market (str): Defaults to '`LRC-ETH`'.
+            offset (int): ... .
+            order_hash (str): ... .
+
+        """
+
+        url = self.endpoint + PATH.TRADE_HISTORY
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "fillTypes": fill_types,
+            "fromId": from_id,
+            "limit": limit,
+            "market": market,
+            "offset": offset,
+            "orderHash": order_hash
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            trades = []
+
+            for t in content["trades"]:
+                trades.append(Trade(*t))
+            
+            return trades
 
     async def submit_internal_transfer(self,
         *,
@@ -963,145 +1157,6 @@ class Client:
             order: PartialOrder = PartialOrder(**content)
 
             return order
-
-    async def get_token_configurations(self) -> List[TokenConfig]:
-        """Return the configs of all supporoted tokens (Ether included).
-        
-        Returns:
-            List[:obj:`~loopring.token.TokenConfig`]: Token configs.
-        
-        Raises:
-            UnknownError: ...
-
-        """
-
-        url = self.endpoint + PATH.TOKENS
-
-        async with self._session.get(url) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-
-            token_confs = []
-
-            for t in content:
-                token_confs.append(TokenConfig(**t))
-            
-            return token_confs
-
-    async def get_user_registration_transactions(self,
-        *,
-        account_id: int=None,
-        end: Union[int, datetime]=None,
-        limit: int=None,
-        offset: int=None,
-        start: Union[int, datetime]=None,
-        status: str=None) -> List[TransactionHashData]:
-        """Return all ethereum transactions from a user upon account registration.
-        
-        Args:
-            account_id (int): Leave blank to receive your client config account's
-                transactions.
-            end (Union[int, :class:`~datetime.datetime`): ... .
-            limit (int): ... .
-            offset (int): ... .
-            start (Union[int, :class:`~datetime.datetime`): ... .
-            status (str): ... .
-        
-        Returns:
-            List[:obj:`~loopring.order.TransactionHashData`]: ... .
-        
-        Raises:
-            EmptyAPIKey: ... .
-            EmptyUser: ... .
-            InvalidAccountID: ... .
-            InvalidAPIKey: ... .
-            UnknownError: ... .
-
-        """
-        url = self.endpoint + PATH.USER_REGISTRATION
-
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = clean_params({
-            "accountId": account_id or self.account_id,
-            "end": validate_timestamp(end),
-            "limit": limit,
-            "offset": offset,
-            "start": validate_timestamp(start),
-            "status": status
-        })
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-            
-            tx_list = []
-
-            for tx in content["transactions"]:
-                tx_list.append(TransactionHashData(**tx))
-
-            return tx_list
-
-    async def get_user_trade_history(self,
-        market: str="LRC-ETH",
-        *,
-        account_id: int=None,
-        fill_types: str=None,
-        from_id: int=None,
-        limit: int=None,
-        offset: int=None,
-        order_hash: str=None) -> List[Trade]:
-        """Get a user's trade history.
-        
-        Args:
-            account_id (int): ... .
-            fill_types (str): Supports '`dex`' and '`amm`'.
-            from_id (int): ... .
-            limit (int): ... .
-            market (str): Defaults to '`LRC-ETH`'.
-            offset (int): ... .
-            order_hash (str): ... .
-
-        """
-
-        url = self.endpoint + PATH.TRADE_HISTORY
-
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = clean_params({
-            "accountId": account_id or self.account_id,
-            "fillTypes": fill_types,
-            "fromId": from_id,
-            "limit": limit,
-            "market": market,
-            "offset": offset,
-            "orderHash": order_hash
-        })
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-            
-            trades = []
-
-            for t in content["trades"]:
-                trades.append(Trade(*t))
-            
-            return trades
 
     # TODO: rename to `regenerate_api_key()`?
     async def update_api_key(self) -> str:

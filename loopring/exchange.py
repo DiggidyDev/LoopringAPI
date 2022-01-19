@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from loopring.util.helpers import to_snake_case
@@ -78,3 +79,41 @@ class Exchange:
     
     def __str__(self) -> str:
         return self.exchange_address
+
+
+class TransactionHashData:
+    
+    block_id: int
+    block_num: int
+    fee_amount: int
+    fee_token_symbol: str
+    hash: str
+    id: int
+    index_in_block: int
+    owner: str
+    progress: str
+    status: str
+    timestamp: datetime
+    tx_hash: str
+    updated_at: datetime
+
+    def __init__(self, **data):
+        for k in data.keys():
+            if k in ("timestamp", "updatedAt"):
+                setattr(self, to_snake_case(k), datetime.fromtimestamp(data[k] / 1000))
+                continue
+
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
+            f"owner='{self.owner}' status='{self.status}' " + \
+            f"progress='{self.progress}' fee_token_symbol={self.fee_token_symbol} " + \
+            f"fee_amount='{self.fee_amount}' block_id={self.block_id} " + \
+            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
+            f"index_in_block={self.index_in_block} id={self.id} " + \
+            f"block_num={self.block_num}>"
+    
+    def __str__(self) -> str:
+        return self.tx_hash
+

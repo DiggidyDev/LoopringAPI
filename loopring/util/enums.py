@@ -122,6 +122,7 @@ class Paths(str, Enum):
     TRADE_HISTORY = "/api/v3/user/trades"
     TRANSFER = "/api/v3/transfer"
     USER_REGISTRATION = "/api/v3/user/createInfo"
+    USER_PASSWORD_RESETS = "/api/v3/user/updateInfo"
 
 
 class IntSig(IntEnum):
