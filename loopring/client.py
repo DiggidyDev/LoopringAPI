@@ -19,8 +19,8 @@ from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import generate_transfer_EIP712_hash
-from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
+from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash
+from .util.sdk.sig.eddsa import OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -1137,7 +1137,8 @@ class Client:
 
     async def submit_internal_transfer(self,
         *,
-        exchange: Union[str, Exchange],
+        client_id: str=None,
+        ecdsa_key: str,
         exchange: Union[str, Exchange]=None,
         payer_id: int,
         payer_address: str,
@@ -1149,13 +1150,13 @@ class Client:
         valid_until: Union[int, datetime]=None,
         valid_since: Union[int, datetime]=None,
         counter_factual_info: CounterFactualInfo=None,
-        memo: str=None,
-        client_id: str=None) -> Transfer:
+        memo: str=None) -> Transfer:
         """Submit an internal transfer.
-        
+
         Args:
             client_id (str): ... .
             counter_factual_info (:obj:`~loopring.order.CounterFactualInfo`): ... .
+            ecdsa_key (str): Ethereum L1 private key.
             exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): ... .
             max_fee (:obj:`~loopring.token.Token`): ... .
             memo (str): ... .
@@ -1165,12 +1166,12 @@ class Client:
             payer_id (int): ... .
             storage_id (int): ... .
             token (:obj:`~loopring.token.Token`): ... .
-            valid_until (Union[int, :class:`~datetime.datetime`]): ... .
             valid_since (Union[int, :class:`~datetime.datetime`]): ... .
+            valid_until (Union[int, :class:`~datetime.datetime`]): ... .
 
         Returns:
             :obj:`~loopring.order.Transfer`: ... .
-        
+
         Raises:
             InvalidArguments: ... .
             InvalidExchangeID: ... .
@@ -1184,19 +1185,16 @@ class Client:
 
         if isinstance(exchange, Exchange):
             exchange = str(exchange)
-        
+
         if not valid_until:
             # Default to 2 months:
             # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
             # for information about order validity and time
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
-        valid_since = datetime.timestamp(datetime.now())
+        valid_since = int(datetime.timestamp(datetime.now()))
 
         url = self.endpoint + PATH.TRANSFER
 
-        # For some reason, ECDSASig and EDDSASig aren't
-        # required parameters in the payload...
-        # Need to look into this...
         payload = clean_params({
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
@@ -1215,8 +1213,8 @@ class Client:
                 "tokenId": token.id,
                 "volume": token.volume
             },
-            "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds")
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
 
         request = Request(
@@ -1226,15 +1224,24 @@ class Client:
             payload=payload
         )
 
+        # EcDSA Signature
         message = generate_transfer_EIP712_hash(request.payload)
-        v, r, s = ecsign(message, self.private_key)
 
-        x_api_sig = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"  # EIP_712
+        ecdsa_key_bytes = int(ecdsa_key, 16).to_bytes(32, byteorder="big")
+        v, r, s = ecsign(message, ecdsa_key_bytes)
+
+        ecdsa_signature = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"  # EIP_712
 
         headers = {
             "X-API-KEY": self.api_key,
-            "X-API-SIG": x_api_sig 
+            "X-API-SIG": ecdsa_signature
         }
+
+        # EdDSA Signature
+        helper = TransferEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(request.payload)
+
+        payload["eddsaSignature"] = eddsa_signature
 
         async with self._session.post(url, headers=headers, json=payload) as r:
             raw_content = await r.read()
@@ -1245,6 +1252,101 @@ class Client:
                 raise_errors_in(content)
             
             return Transfer(**content)
+
+    async def submit_offchain_withdrawal_request(self,
+        *,
+        account_id: int=None,
+        counter_factual_info: CounterFactualInfo=None,
+        ecdsa_key: str,
+        exchange: Union[str, Exchange]=None,
+        extra_data: bytes=b"",
+        fast_withdrawal_mode: bool=None,
+        hash_approved: str=None,
+        owner: str,
+        max_fee: Token,
+        min_gas: int=0,
+        storage_id: int,
+        to: str,
+        token: Token,
+        valid_since: Union[int, datetime]=None,
+        valid_until: Union[int, datetime]=None) -> PartialOrder:
+        """Submit an offchain withdrawal request."""
+
+        if not valid_until:
+            # Default to 2 months:
+            # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
+            # for information about order validity and time
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        valid_since = int(datetime.timestamp(datetime.now()))
+
+        url = self.endpoint + PATH.USER_WITHDRAWALS
+
+        onchain_data_hash = "0x" + bytes.hex(
+            generate_onchain_data_hash(
+                min_gas=min_gas, to=to, extra_data=extra_data
+            )
+        )
+
+        payload = clean_params({
+            "accountId": account_id or self.account_id,
+            "counterFactualInfo": counter_factual_info,
+            "exchange": exchange or str(self.exchange),
+            "extraData": extra_data,
+            "fastWithdrawalMode": fast_withdrawal_mode,
+            "hashApproved": hash_approved,
+            "onChainDataHash": onchain_data_hash,
+            "owner": owner,
+            "maxFee": {
+                "tokenId": max_fee.id,
+                "volume": max_fee.volume
+            },
+            "minGas": min_gas,
+            "storageId": storage_id,
+            "to": to,
+            "token": {
+                "tokenId": token.id,
+                "volume": token.volume
+            },
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
+        })
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.USER_WITHDRAWALS,
+            payload=payload
+        )
+
+        message = generate_offchain_withdrawal_EIP712_hash(request.payload)
+        ecdsa_key_bytes = int(ecdsa_key, 16).to_bytes(32, byteorder="big")
+        v, r, s = ecsign(message, ecdsa_key_bytes)
+
+        ecdsa_signature = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": ecdsa_signature
+        }
+
+        helper = WithdrawalEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(request.payload)
+
+        payload["ecdsaSignature"] = ecdsa_signature
+        payload["eddsaSignature"] = eddsa_signature
+        payload["extraData"] = payload.get("extraData", b"").decode()
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            withdrawal = PartialOrder(**content)
+
+            return withdrawal
 
     async def submit_order(self,
                         *,
@@ -1261,8 +1363,8 @@ class Client:
                         storage_id: int,
                         taker: str=None,
                         trade_channel: str=None,
-                        valid_until: Union[int, datetime]=None,
-                        valid_since: Union[int, datetime]=None
+                        valid_since: Union[int, datetime]=None,
+                        valid_until: Union[int, datetime]=None
                         ) -> PartialOrder:
         """Submit an order.
         
@@ -1293,7 +1395,7 @@ class Client:
                 specify the taker's address.
             trade_channel (str): The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
-            valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
+            valid_since (Union[int, :class:`~datetime.datetime`): The order's init \
                 time, in seconds.
             valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
                 time, in seconds.
@@ -1328,12 +1430,27 @@ class Client:
         
         """
 
+        if not (self.__exchange_domain_initialised or exchange):
+            raise InvalidArguments("Please initialise the exchange or provide one.")
+        
+        if not valid_until:
+            # Default to 2 months:
+            # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
+            # for information about order validity and time
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        valid_since = int(datetime.timestamp(datetime.now()))
+
         url = self.endpoint + PATH.ORDER
 
         payload = clean_params({
             "accountId": self.account_id,
             "affiliate": affiliate,
-            "allOrNone": False,  # all_or_none,
+
+            # 'allOrNone' currently doesn't accept anything
+            # other than 'False' - this will be editable
+            # once the API starts accepting other values
+            "allOrNone": False,
+
             "buyToken": {
                 "tokenId": buy_token.id,
                 "volume": buy_token.volume
@@ -1351,8 +1468,8 @@ class Client:
             "storageId": storage_id,
             "taker": taker,
             "tradeChannel": trade_channel,
-            "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds")
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
 
         request = Request(
