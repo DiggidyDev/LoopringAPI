@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 
 import loopring
 from loopring.util.enums import Endpoints
@@ -12,11 +13,14 @@ cfg = {
 
 client = loopring.Client(handle_errors=True, config=cfg)
 
-
 async def main():
-    info = await client.get_account_info(address=client.address)
+    
+    # Get orders made in the past 8 days
+    rt = await client.get_relayer_time()
+    start = rt - timedelta(8)
 
-    print(info, type(info))
+    orders = await client.get_multiple_orders(start=start)
+    print(orders)
 
 
 if __name__ == "__main__":
