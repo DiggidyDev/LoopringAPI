@@ -1,6 +1,10 @@
-from typing import Callable
+import time
+from datetime import datetime
+from typing import Callable, Union
 
 from aiolimiter import AsyncLimiter
+
+from ..errors import ValidationException
 
 from ..util.mappings import Mappings
 
@@ -114,3 +118,66 @@ def to_snake_case(camel: str) -> str:
         snake += _
     
     return snake
+
+
+def validate_timestamp(
+    timestamp: Union[int, datetime],
+    unit: str="ms",
+    validate_future: bool=False
+    ) -> int:
+    """Validate whether the given time will be suitable for the API.
+    
+    The API seems to like taking timestamps in both ms and seconds format, which
+    requires a length of 13 and 10 respectively. A datetime object's timestamp can
+    be multiplied by 1000, but if a user wishes to pass an int, it has to be the 
+    right length. The :meth:`~datetime.datetime.fromtimestamp()` method takes a 10
+    digit timestamp.
+
+    Args:
+        timestamp (Union[int, :obj:`~datetime.datetime`]): The `int` or
+            :obj:`datetime.datetime` object to be validated.
+        unit (str): Whether to validate the timestamp as seconds or 'ms'.
+    
+    Returns:
+        int: A 13 digit or 10 digit timestamp.
+
+    Raises:
+        ValidationException: The int wasn't the right length, or the timestamp \
+            was in the past.
+        TypeError: The `time` wasn't of the expected type.
+
+    """
+    multiplier = 1000 if unit == "ms" else 1
+
+    if isinstance(timestamp, datetime):
+        ts = int(timestamp.timestamp() * multiplier)
+
+        # Check that the timestamp is in the future
+        # TODO: Maybe raise a warning if the timestamp
+        #       is in the near future?
+        if validate_future and ts < int(time.time()) * multiplier:
+            raise ValidationException("Please enter a future time.")
+
+        return ts
+    
+    if isinstance(timestamp, int):
+        exp_len = 13 if unit == "ms" else 10
+
+        if len(str(timestamp)) != exp_len:
+            raise ValidationException(
+                f"Invalid length (received `{len(str(timestamp))}` instead of " + \
+                f"`{exp_len}`). Try using a datetime object, or refer to the " + \
+                "documentation."
+            )
+        
+        # Check the timestamp is in the future
+        if validate_future and timestamp < int(time.time()) * multiplier:
+            raise ValidationException("Please enter a future timestamp.")
+
+        return timestamp
+    
+    if timestamp:
+        raise TypeError(
+            f"Invalid type. Expected 'int' or 'datetime.datetime', got '{type(timestamp)}'."
+        )
+
