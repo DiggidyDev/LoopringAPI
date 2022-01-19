@@ -24,8 +24,8 @@ class Account:
     
     def __repr__(self) -> str:
         return f"<account_id={self.account_id} owner='{self.owner}' " + \
-            f"publicX='{self.publicX}' publicY='{self.publicY}' nonce={self.nonce}" + \
-            f"key_nonce={self.key_nonce} key_seed='{self.key_seed} tags={self.tags}'>"
+            f"publicX='{self.publicX}' publicY='{self.publicY}' nonce={self.nonce} " + \
+            f"key_nonce={self.key_nonce} key_seed='{self.key_seed}' tags={self.tags}'>"
     
     def __str__(self) -> str:
         return self.owner
