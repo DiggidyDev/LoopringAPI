@@ -71,6 +71,14 @@ class InconsistentTokens(LoopringError):
         super().__init__(message)
 
 
+class InsufficientBalanceForFees(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Balance didn't meet the transaction trade cost + fees."
+        super().__init__(message)
+
+
 class InvalidAccountID(LoopringError):
 
     def __init__(self, message: str=None):
@@ -172,6 +180,14 @@ class InvalidUserBalance(LoopringError):
     def __init__(self, message: str=None):
         if not message:
             message = "Insufficient user balance."
+        super().__init__(message)
+
+
+class MinimumFeesNotExceeded(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "The minimum fee wasn't met or exceeded."
         super().__init__(message)
 
 
