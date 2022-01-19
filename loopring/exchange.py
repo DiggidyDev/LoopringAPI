@@ -142,3 +142,26 @@ class TransactionHashData(_BaseTransaction):
             f"index_in_block={self.index_in_block} id={self.id} " + \
             f"block_num={self.block_num}>"
 
+
+
+# TODO: Redesign these classes and inheritances to fix unwanted intellisense
+#       suggestions (e.g. '.owner')
+class WithdrawalHashData(TransactionHashData, DepositHashData):
+
+    distribute_hash: str
+    fast_status: str
+    request_id: int
+    tx_type: str
+
+    def __init__(self, **data):
+        super().__init__(**data)
+    
+    def __repr__(self) -> str:
+        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
+            f"tx_type='{self.tx_type}' status='{self.status}' " + \
+            f"progress='{self.progress}' fee_token_symbol={self.fee_token_symbol} " + \
+            f"fee_amount='{self.fee_amount}' block_id={self.block_id} " + \
+            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
+            f"index_in_block={self.index_in_block} id={self.id} " + \
+            f"block_num={self.block_num} distribute_hash='{self.distribute_hash}' " + \
+            f"fast_status='{self.fast_status}' request_id={self.request_id}>"
