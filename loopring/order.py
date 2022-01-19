@@ -33,7 +33,7 @@ class Validity:
 
     def __init__(self, **data) -> None:
         for k in data:
-            setattr(self, k, datetime.fromtimestamp(data[k] / 1000))
+            setattr(self, k, datetime.fromtimestamp(data[k]))
     
     def __repr__(self) -> None:
         return f"<end='{self.end}' start='{self.start}'>"
@@ -308,7 +308,7 @@ class TransactionHashData:
             if k == "timestamp":
                 self.timestamp = datetime.fromtimestamp(data[k] / 1000)
                 continue
-            
+
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
