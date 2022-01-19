@@ -607,7 +607,8 @@ class Client:
         }
         params = {
             "accountId": self.account_id,
-            "sellTokenId": sell_token_id
+            "sellTokenId": sell_token_id,
+            "maxNext": 0
         }
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -1131,6 +1132,7 @@ class Client:
         max_fee: Token,
         storage_id: int,
         valid_until: Union[int, datetime]=None,
+        valid_since: Union[int, datetime]=None,
         counter_factual_info: CounterFactualInfo=None,
         memo: str=None,
         client_id: str=None) -> Transfer:
@@ -1149,7 +1151,8 @@ class Client:
             storage_id (int): ... .
             token (:obj:`~loopring.token.Token`): ... .
             valid_until (Union[int, :class:`~datetime.datetime`]): ... .
-        
+            valid_since (Union[int, :class:`~datetime.datetime`]): ... .
+
         Returns:
             :obj:`~loopring.order.Transfer`: ... .
         
@@ -1172,6 +1175,7 @@ class Client:
             # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
             # for information about order validity and time
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        valid_since = datetime.timestamp(datetime.now())
 
         url = self.endpoint + PATH.TRANSFER
 
@@ -1193,7 +1197,8 @@ class Client:
                 "tokenId": token.id,
                 "volume": token.volume
             },
-            "validUntil": validate_timestamp(valid_until, "seconds", True)
+            "validUntil": validate_timestamp(valid_until, "seconds", True),
+            "validSince": validate_timestamp(valid_since, "seconds", True)
         })
 
         request = Request(
@@ -1238,7 +1243,8 @@ class Client:
                         storage_id: int,
                         taker: str=None,
                         trade_channel: str=None,
-                        valid_until: Union[int, datetime]=None
+                        valid_until: Union[int, datetime]=None,
+                        valid_since: Union[int, datetime]=None
                         ) -> PartialOrder:
         """Submit an order.
         
@@ -1325,7 +1331,8 @@ class Client:
             "storageId": storage_id,
             "taker": taker,
             "tradeChannel": trade_channel,
-            "validUntil": validate_timestamp(valid_until, "seconds", True)
+            "validUntil": validate_timestamp(valid_until, "seconds", True),
+            "validSince": validate_timestamp(valid_since, "seconds", True)
         })
 
         request = Request(
