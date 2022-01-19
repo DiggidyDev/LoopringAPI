@@ -11,7 +11,11 @@ class EIP712:
     amm_pool_domains: dict = {}
 
     @classmethod
-    def init_env(cls, name, version, chain_id, verifying_contract):
+    def init_env(cls,
+        name="Loopring Protocol",
+        version="3.6.0",
+        chain_id=None,
+        verifying_contract=None):
         cls.exchange_domain = eip712_structs.make_domain(
             name=name,
             version=version,

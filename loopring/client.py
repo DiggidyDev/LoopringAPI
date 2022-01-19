@@ -55,6 +55,7 @@ class Client:
     address: str
     api_key: str
     endpoint: ENDPOINT
+    exchange: Exchange
     handle_errors: bool
     private_key: str
     publicX: str
@@ -72,6 +73,7 @@ class Client:
                 publicY: str=None,
                 **config
                 ):
+        self.__exchange_domain_initialised = False
         self.__handle_errors = handle_errors
         
         cfg = config.get("config", {})
@@ -287,7 +289,7 @@ class Client:
                 raise_errors_in(content)
             
             exchange = Exchange(**content)
-            
+
             return exchange
 
     async def get_fiat_prices(self, currency: str="USD") -> List[Price]:
@@ -1121,9 +1123,22 @@ class Client:
             
             return trades
 
+    async def init_exchange_configuration(self) -> None:
+        """Initialise the exchange config for L1 requests."""
+        self.exchange = await self.get_exchange_configurations()
+
+        if not self.__exchange_domain_initialised:
+            EIP712.init_env(
+                chain_id=self.exchange.chain_id,
+                verifying_contract=str(self.exchange)
+            )
+
+            self.__exchange_domain_initialised = True
+
     async def submit_internal_transfer(self,
         *,
         exchange: Union[str, Exchange],
+        exchange: Union[str, Exchange]=None,
         payer_id: int,
         payer_address: str,
         payee_id: int,
@@ -1185,8 +1200,11 @@ class Client:
         payload = clean_params({
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
-            "exchange": exchange,
-            "maxFee": max_fee,
+            "exchange": exchange or str(self.exchange),
+            "maxFee": {
+                "tokenId": max_fee.id,
+                "volume": max_fee.volume
+            },
             "memo": memo,
             "payeeAddr": payee_address,
             "payeeId": payee_id,
@@ -1234,7 +1252,7 @@ class Client:
                         all_or_none: str=False,
                         buy_token: Token,
                         client_order_id: str=None,
-                        exchange: str,
+                        exchange: Union[str, Exchange]=None,
                         fill_amount_b_or_s: bool,
                         max_fee_bips: int,
                         order_type: str=None,
@@ -1257,8 +1275,8 @@ class Client:
                 to describe a token associated with a certain quantity.
             client_order_id (str): An arbitrary, unique client-side
                 order ID.
-            exchange (str): The address of the exchange used to process
-                this order.
+            exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): The address of \
+                the exchange used to process this order.
             fill_amount_b_or_s (bool): Fill the size by the `'BUY'` (True) or `'SELL'` (False) \
                 token.
             max_fee_bips (int): Maximum order fee that the user can accept, \
@@ -1321,7 +1339,7 @@ class Client:
                 "volume": buy_token.volume
             },
             "clientOrderId": client_order_id,
-            "exchange": exchange,
+            "exchange": exchange or str(self.exchange),
             "fillAmountBOrS": fill_amount_b_or_s,
             "maxFeeBips": max_fee_bips,
             "orderType": order_type,
