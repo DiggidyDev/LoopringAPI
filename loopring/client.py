@@ -11,7 +11,7 @@ from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
 from .errors import *
-from .exchange import DepositHashData, Exchange, TransactionHashData, WithdrawalHashData
+from .exchange import DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Price, Token, TokenConfig
@@ -1122,6 +1122,51 @@ class Client:
                 trades.append(Trade(*t))
             
             return trades
+
+    async def get_user_transfer_history(self,
+        *,
+        account_id: int=None,
+        end: Union[int, datetime]=None,
+        hashes: Union[str, Sequence[str]]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        status: str=None,
+        token_symbol: str=None,
+        transfer_types: str=None) -> List[TransferHashData]:
+        """Get a user's transfer history."""
+
+        url = self.endpoint + PATH.USER_TRANSFERS
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "end": validate_timestamp(end),
+            "hashes": hashes,
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "status": status,
+            "tokenSymbol": token_symbol,
+            "transferTypes": transfer_types
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transfers = []
+
+            for t in content["transactions"]:
+                transfers.append(TransferHashData(**t))
+            
+            return transfers
 
     async def init_exchange_configuration(self) -> None:
         """Initialise the exchange config for L1 requests."""
