@@ -81,16 +81,13 @@ class Exchange:
         return self.exchange_address
 
 
-class TransactionHashData:
-    
+class _BaseTransaction:
+
     block_id: int
     block_num: int
-    fee_amount: int
-    fee_token_symbol: str
-    hash: str
+    hash: int
     id: int
     index_in_block: int
-    owner: str
     progress: str
     status: str
     timestamp: datetime
@@ -105,6 +102,37 @@ class TransactionHashData:
 
             setattr(self, to_snake_case(k), data[k])
     
+    def __str__(self) -> str:
+        return self.tx_hash
+
+
+class DepositHashData(_BaseTransaction):
+
+    amount: int
+    symbol: str
+
+    def __init__(self, **data):
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
+            f"amount={self.amount} status='{self.status}' " + \
+            f"progress='{self.progress}' symbol='{self.symbol}' " + \
+            f"block_num='{self.block_num}' block_id={self.block_id} " + \
+            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
+            f"index_in_block={self.index_in_block} id={self.id}>"
+
+
+class TransactionHashData(_BaseTransaction):
+    
+    fee_amount: int
+    fee_token_symbol: str
+    owner: str
+
+    def __init__(self, **data):
+        super().__init__(**data)
+    
     def __repr__(self) -> str:
         return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
             f"owner='{self.owner}' status='{self.status}' " + \
@@ -113,7 +141,4 @@ class TransactionHashData:
             f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
             f"index_in_block={self.index_in_block} id={self.id} " + \
             f"block_num={self.block_num}>"
-    
-    def __str__(self) -> str:
-        return self.tx_hash
 
