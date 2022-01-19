@@ -17,7 +17,8 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 # TODO:
 
 - [x] Support datetime objects for timestamps.
-- [ ] Now that I understand where/when to use the EDDSA & EcDSA sigs, it's time to implement them to transfer submissions, withdrawal requests, and order submissions!
+- [ ] Now that I understand where/when to use the EDDSA & EcDSA sigs, it's time to implement them to transfer submissions, withdrawal requests, and order submissions! ! IMPORTANT NOTE ! EcDSA key is the Ethereum L1 wallet private key - available to get from an external wallet such as metamask etc.
+- [ ] Make a `CONTRIBUTING.md`
 - [ ] Look into turning prices into floats instead of strings.
 - [ ] Figure out why `keySeed` isn't being returned from the account query endpoint.
 - [ ] Finish off REST API endpoints.
