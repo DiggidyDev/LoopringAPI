@@ -3,13 +3,13 @@ import json
 import time
 from asyncio.events import AbstractEventLoop
 from datetime import datetime
-from typing import List, Union
+from typing import List, Sequence, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
-from .account import Account
+from .account import Account, Balance
 from .errors import *
 from .exchange import Exchange, TransactionHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -810,6 +810,68 @@ class Client:
                 token_confs.append(TokenConfig(**t))
             
             return token_confs
+
+    async def get_user_exchange_balances(self,
+        *,
+        account_id: int=None,
+        tokens: Union[str, int, Sequence[Union[str, int, Token]]]="0,1"
+        ) -> List[Balance]:
+        """Get all eth and token balances on a user's exchange account.
+
+        Args:
+            account_id (int): ... .
+            tokens (Union[str, int, Sequence[Union[str, int, Token]]]): ... .
+
+        Returns:
+            List[:obj:`~loopring.account.Balance`]: ... .
+
+        Raises:
+            EmptyAPIKey: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.USER_BALANCES
+
+        # Not sure if this is really necessary, just an
+        # extra layer of protection from user error x)
+        if isinstance(tokens, (tuple, list)):
+            old = tokens.copy()
+            tokens = []
+
+            for t in old:
+                if isinstance(t, Token):
+                    tokens.append(t.id)
+                elif isinstance(t, (int, str)):
+                    tokens.append(t)
+
+            # Ensure all `_` are strings
+            tokens = ",".join([f"{_}" for _ in tokens])
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "tokens": tokens
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            balances = []
+
+            for b in content:
+                balances.append(Balance(**b))
+            
+            return balances
 
     async def get_user_registration_transactions(self,
         *,
