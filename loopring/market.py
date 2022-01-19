@@ -1,4 +1,5 @@
-import re
+from datetime import datetime
+
 from .util.helpers import to_snake_case
 
 
@@ -40,7 +41,7 @@ class Ticker:
     number_of_trades: int
     opening_price: str
     quote_token_volume: int
-    timestamp: int
+    timestamp: datetime
 
     # These two are only for AMM
     base_fee_amount: str
@@ -63,7 +64,7 @@ class Ticker:
         base_fee_amount=None,
         quote_fee_amount=None):
         self.market             = market or "N/A"
-        self.timestamp          = int(timestamp) or "N/A"
+        self.timestamp          = datetime.fromtimestamp(int(timestamp) / 1000) or "N/A"
         self.base_token_volume  = int(base_token_volume) or "N/A"
         self.quote_token_volume = int(quote_token_volume) or "N/A"
         self.opening_price      = opening_price or "N/A"
@@ -73,6 +74,9 @@ class Ticker:
         self.number_of_trades   = int(number_of_trades) or "N/A"
         self.highest_bid        = highest_bid or "N/A"
         self.lowest_ask         = lowest_ask or "N/A"
+
+        # The "N/A" should only happen for these two, but I
+        # added it as a precaution for the other attrs too
         self.base_fee_amount    = base_fee_amount or "N/A"
         self.quote_fee_amount   = quote_fee_amount or "N/A"
     
@@ -85,7 +89,7 @@ class Ticker:
         return f"<market='{self.market}' highest_price='{self.highest_price}' " + \
             f"lowest_price='{self.lowest_price}' highest_bid='{self.highest_bid}' " + \
             f"lowest_ask='{self.lowest_ask}' closing_price='{self.closing_price}' " + \
-            f"opening_price='{self.opening_price}' timestamp={self.timestamp} " + \
+            f"opening_price='{self.opening_price}' timestamp='{self.timestamp}' " + \
             f"base_token_volume={self.base_token_volume} " + \
             f"quote_token_volume={self.quote_token_volume}{amm_fees}>"
     
@@ -102,7 +106,7 @@ class Trade:
     market: str
     price: str
     record_id: str
-    trade_time: int
+    trade_time: datetime
     volume: int
 
     def __init__(self,
@@ -122,7 +126,7 @@ class Trade:
         self.market = market
         self.price = price
         self.record_id = record_id
-        self.trade_time = int(trade_time)
+        self.trade_time = datetime.fromtimestamp(int(trade_time) / 1000)
         self.volume = int(volume)
 
     def __repr__(self) -> str:
@@ -140,6 +144,20 @@ class Trade:
 
 class Candlestick:
 
+    """A candlestick model class.
+    
+    Attributes:
+        base_transaction_volume (int): ...
+        closing_price (str): ...
+        highest_price (str): ...
+        lowest_price (str): ...
+        number_of_transactions (int): ...
+        opening_price (str): ...
+        quote_transaction_volume (int): ...
+        start_time (:class:`~datetime.datetime`): ...
+
+    """
+
     base_transaction_volume: int
     closing_price: str
     highest_price: str
@@ -147,7 +165,7 @@ class Candlestick:
     number_of_transactions: int
     opening_price: str
     quote_transaction_volume: int
-    start_time: int
+    start_time: datetime
 
     def __init__(self,
     start_time,
@@ -165,7 +183,7 @@ class Candlestick:
         self.number_of_transactions = int(number_of_transactions)
         self.opening_price = opening_price
         self.quote_transaction_volume = int(quote_transaction_volume)
-        self.start_time = int(start_time)
+        self.start_time = datetime.fromtimestamp(int(start_time) / 1000)
     
     def __repr__(self) -> str:
         # Not all attrs added - maybe add them all?
@@ -173,7 +191,7 @@ class Candlestick:
             f"highest_price='{self.highest_price}' " + \
             f"opening_price='{self.opening_price}' " + \
             f"closing_price='{self.closing_price}' " + \
-            f"start_time={self.start_time}>"
+            f"start_time='{self.start_time}'>"
     
     def __str__(self) -> str:
         return f"High: {self.highest_price} Low: {self.lowest_price} " + \

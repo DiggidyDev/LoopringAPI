@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from .util.helpers import to_snake_case
@@ -50,29 +51,46 @@ class OrderAmount:
 
 class Price:
     """A Price model.
-    
+
     Note:
-        You may want to refer to the `updated_at` attribute, as the price
-        may be delayed and not reflect the current live price.
+        You may want to refer to the :attr:`~loopring.token.Price.updated_at` \
+        attribute, as the price may be delayed and not reflect the current live \
+        price.
+    
+    Attributes:
+        currency (str): ... .
+        price (str): ... .
+        symbol (str): ... .
+        updated_at (:class:`~datetime.datetime`): ... .
 
     """
 
     currency: str
     price: str
     symbol: str
-    updated_at: int
+    updated_at: datetime
 
     def __init__(self, *, currency: str, **data):
         self.currency = currency
         for k in data.keys():
+            if k == "updatedAt":
+
+                # For some reason I don't need to do `data[k] / 1000`
+                # like I've had to do in other places...
+                # Bit annoying that there isn't a standard format of
+                # timestamps :p
+                self.updated_at = datetime.fromtimestamp(data[k])
+                continue
+
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
         return f"<price='{self.price}' currency='{self.currency}' " + \
-            f"symbol='{self.symbol}' updated_at={self.updated_at}>"
+            f"symbol='{self.symbol}' updated_at='{self.updated_at}'>"
     
     def __str__(self) -> str:
-        return f"1 {self.symbol} = {Mappings.CURRENCY_MAPPINGS[self.currency]}" + \
+        currency_map = Mappings.CURRENCY_MAPPINGS
+        return f"1 {self.symbol} = {currency_map[self.currency.upper()]}" + \
             f"{self.price}"
 
 
@@ -97,9 +115,9 @@ class Token:
 
 
 class TokenConfig:
-    """
+    """Token configuration model class.
     
-    Args:
+    Attributes:
         address (str): ...
         decimals (int): ...
         enabled (bool): ...

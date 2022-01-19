@@ -2,6 +2,7 @@ import asyncio
 import json
 import time
 from asyncio.events import AbstractEventLoop
+from datetime import datetime
 from typing import List, Union
 
 import aiohttp
@@ -18,7 +19,7 @@ from .order import (
 from .token import Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
-from .util.helpers import clean_params, raise_errors_in, ratelimit
+from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
 from .util.sdk.sig.ecdsa import generate_transfer_EIP712_hash
 from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
@@ -130,7 +131,7 @@ class Client:
                         client_order_id: str=None,
                         orderhash: str=None
                         ) -> PartialOrder:
-        """Cancel order using order hash or client-side ID.
+        """Cancel an order.
 
         Args:
             client_order_id (str): ...
@@ -272,6 +273,9 @@ class Client:
         Returns:
             :obj:`~loopring.exchange.Exchange`: ...
 
+        Raises:
+            UnknownError: ... .
+
         """
 
         url = self.endpoint + PATH.EXCHANGES
@@ -326,10 +330,10 @@ class Client:
 
     async def get_market_candlestick(self,
         market: str="LRC-ETH",
-        interval:str="5min",
+        interval: str="5min",
         *,
-        start: int=None,
-        end: int=None,
+        start: Union[int, datetime]=None,
+        end: Union[int, datetime]=None,
         limit: int=None) -> List[Candlestick]:
         """Get candlestick data for a given `market` (trading pair).
 
@@ -348,7 +352,9 @@ class Client:
 
         Raises:
             InvalidArguments: ...
+            TypeError: From timestamp validation.
             UnknownError: ...
+            ValidationException: From timestamp validation.
 
         """
 
@@ -357,8 +363,8 @@ class Client:
         params = clean_params({
             "market": market,
             "interval": interval,
-            "start": start,
-            "end": end,
+            "start": validate_timestamp(start),
+            "end": validate_timestamp(end),
             "limit": limit
         })
 
@@ -478,25 +484,24 @@ class Client:
             return tickers
 
     async def get_multiple_orders(self, *,
-                                end: int=0,
+                                end: Union[int, datetime]=None,
                                 limit: int=50,
                                 market: str=None,
                                 offset: int=0,
                                 order_types: str=None,
                                 side: str=None,
-                                start: int=0,
+                                start: Union[int, datetime]=None,
                                 status: str=None,
-                                trade_channels: str=None
-                                ) -> List[Order]:
+                                trade_channels: str=None) -> List[Order]:
         """Get a list of orders satisfying certain criteria.
 
         Note:
             All arguments are optional. \ 
             All string-based arguments are case-insensitive. For example,
             `trade_channels='MIXED'` returns the same results as `trade_channels='mIxEd'`.
-        
+
         Args:
-            end (int): The upper bound of an order's creation timestamp,
+            end (Union[int, :class:`~datetime.datetime`]): The upper bound of an order's creation timestamp,
                 in milliseconds. Defaults to `0`.
             limit (int): The maximum number of orders to be returned. Defaults
                 to `50`.
@@ -505,8 +510,8 @@ class Client:
             order_types (str): Types of orders available:
                 `'LIMIT_ORDER'`, `'MAKER_ONLY'`, `'TAKER_ONLY'`, `'AMM'`. 
             side (str): The type of order made, a `'BUY'` or `'SELL'`.
-            start (int): The lower bound of an order's creation timestamp,
-                in milliseconds. Defaults to `0`.
+            start (Union[int, :class:`~datetime.datetime`): The lower bound of an
+                order's creation timestamp, in milliseconds. Defaults to `0`.
             status (str): The order's status:
                 `'PROCESSING'`, `'PROCESSED'`, `'FAILED'`, `'CANCELLED'`, `'CANCELLING'`,
                 `'EXPIRED'`.
@@ -536,13 +541,13 @@ class Client:
         }
         params = clean_params({
             "accountId": self.account_id,
-            "end": end,
+            "end": validate_timestamp(end),
             "limit": limit,
             "market": market,
             "offset": offset,
             "orderTypes": order_types,
             "side": side,
-            "start": start,
+            "start": validate_timestamp(start),
             "status": status,
             "tradeChannels": trade_channels
         })
@@ -562,6 +567,7 @@ class Client:
 
             return orders
 
+    # TODO: Return obj instead of dict?
     async def get_next_storage_id(self, sell_token_id: Union[int, Token]=None) -> dict:
         """Get the next storage ID.
 
@@ -572,8 +578,9 @@ class Client:
         Each new order ID can be derived from adding 2 to the last one.
         
         Args:
-            sell_token_id (int): The unique identifier of the token which the user
-                wants to sell in the next order.
+            sell_token_id (Union[int, :int:`~loopring.token.Token`): The unique
+                identifier of the token which the user wants to sell in the next
+                order.
 
         Returns:
             :obj:`dict`: A :obj:`dict` containing the `orderId` and `offchainId`.
@@ -695,11 +702,12 @@ class Client:
             return trades
 
     # @ratelimit(5, 1)  # Work in progress
-    async def get_relayer_timestamp(self) -> int:
-        """Get relayer's current timestamp.
+    async def get_relayer_time(self) -> datetime:
+        """Get relayer's current time as a datetime object.
 
         Returns:
-            :class:`int`: The Epoch Unix Timestamp according to the relayer.
+            :class:`~datetime.datetime`: The Epoch Unix Time according \
+                to the relayer.
 
         Raises:
             UnknownError: Something has gone wrong. Probably out of
@@ -716,7 +724,9 @@ class Client:
             if self.handle_errors:
                 raise_errors_in(content)
 
-            return content["timestamp"]
+            dt = datetime.fromtimestamp(content["timestamp"] / 1000)
+
+            return dt
 
     async def submit_internal_transfer(self,
         *,
@@ -728,7 +738,7 @@ class Client:
         token: Token,
         max_fee: Token,
         storage_id: int,
-        valid_until: int=None,
+        valid_until: Union[int, datetime]=None,
         counter_factual_info: CounterFactualInfo=None,
         memo: str=None,
         client_id: str=None) -> Transfer:
@@ -746,7 +756,7 @@ class Client:
             payer_id (int): ... .
             storage_id (int): ... .
             token (:obj:`~loopring.token.Token`): ... .
-            valid_until (int): ... .
+            valid_until (Union[int, :class:`~datetime.datetime`]): ... .
         
         Returns:
             :obj:`~loopring.order.Transfer`: ... .
@@ -765,7 +775,7 @@ class Client:
         if isinstance(exchange, Exchange):
             exchange = str(exchange)
         
-        if valid_until is not None:
+        if not valid_until:
             # Default to 2 months:
             # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
             # for information about order validity and time
@@ -776,7 +786,7 @@ class Client:
         # For some reason, ECDSASig and EDDSASig aren't
         # required parameters in the payload...
         # Need to look into this...
-        payload = {
+        payload = clean_params({
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
             "exchange": exchange,
@@ -791,10 +801,8 @@ class Client:
                 "tokenId": token.id,
                 "volume": token.volume
             },
-            "validUntil": valid_until
-        }
-
-        payload = {k: v for k, v in payload.items() if v is not None}
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
+        })
 
         request = Request(
             "post",
@@ -838,7 +846,7 @@ class Client:
                         storage_id: int,
                         taker: str=None,
                         trade_channel: str=None,
-                        valid_until: int
+                        valid_until: Union[int, datetime]=None
                         ) -> PartialOrder:
         """Submit an order.
         
@@ -869,7 +877,8 @@ class Client:
                 specify the taker's address.
             trade_channel (str): The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
-            valid_until (int): The order expiry time, in seconds.
+            valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
+                time, in seconds.
 
         Returns:
             :class:`~loopring.order.PartialOrder`: The order just submitted.
@@ -903,7 +912,7 @@ class Client:
 
         url = self.endpoint + PATH.ORDER
 
-        payload = {
+        payload = clean_params({
             "accountId": self.account_id,
             "affiliate": affiliate,
             "allOrNone": False,  # all_or_none,
@@ -924,11 +933,8 @@ class Client:
             "storageId": storage_id,
             "taker": taker,
             "tradeChannel": trade_channel,
-            "validUntil": valid_until
-        }
-
-        # Filter out unused params
-        payload = {k: v for k, v in payload.items() if v is not None}
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
+        })
 
         request = Request(
             "post",
@@ -989,20 +995,20 @@ class Client:
     async def get_user_registration_transactions(self,
         *,
         account_id: int=None,
-        end: int=None,
+        end: Union[int, datetime]=None,
         limit: int=None,
         offset: int=None,
-        start: int=None,
+        start: Union[int, datetime]=None,
         status: str=None) -> List[TransactionHashData]:
         """Return all ethereum transactions from a user upon account registration.
         
         Args:
             account_id (int): Leave blank to receive your client config account's
                 transactions.
-            end (int): ... .
+            end (Union[int, :class:`~datetime.datetime`): ... .
             limit (int): ... .
             offset (int): ... .
-            start (int): ... .
+            start (Union[int, :class:`~datetime.datetime`): ... .
             status (str): ... .
         
         Returns:
@@ -1023,10 +1029,10 @@ class Client:
         }
         params = clean_params({
             "accountId": account_id or self.account_id,
-            "end": end,
+            "end": validate_timestamp(end),
             "limit": limit,
             "offset": offset,
-            "start": start,
+            "start": validate_timestamp(start),
             "status": status
         })
 

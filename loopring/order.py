@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Any, Dict, List
-from .util.helpers import to_snake_case
 
+from .util.helpers import to_snake_case
 
 
 class CounterFactualInfo:
@@ -22,20 +23,20 @@ class Validity:
     """A class representative of an order's validity.
     
     Attributes:
-        end (int): ...
-        start (int): ...
+        end (:class:`~datetime.datetime`): ...
+        start (:class:`~datetime.datetime`): ...
     
     """
     
-    end: int
-    start: int
+    end: datetime
+    start: datetime
 
     def __init__(self, **data) -> None:
         for k in data:
-            setattr(self, k, data[k])
+            setattr(self, k, datetime.fromtimestamp(data[k] / 1000))
     
     def __repr__(self) -> None:
-        return f"<end={self.end} start={self.start}>"
+        return f"<end='{self.end}' start='{self.start}'>"
 
 
 class Volume:
@@ -82,7 +83,6 @@ class Transfer:
     
     def __str__(self) -> str:
         return self.hash
-
 
 
 class PartialOrder(Transfer):
@@ -252,7 +252,7 @@ class OrderBook:
     asks: List[Ask]
     bids: List[Bid]
     market: str
-    timestamp: int  # TODO: Better timestamp (datetime module?)
+    timestamp: datetime
     version: int
 
     def __init__(self, **data):
@@ -271,6 +271,8 @@ class OrderBook:
                     bids.append(Bid(*b))
                 
                 setattr(self, to_snake_case(k), bids)
+            elif k == "timestamp":
+                setattr(self, k, datetime.fromtimestamp(data[k] / 1000))
             else:
                 setattr(self, to_snake_case(k), data[k])
     
@@ -279,11 +281,10 @@ class OrderBook:
 
     def __repr__(self) -> str:
         return f"<market='{self.market}' version='{self.version}' " + \
-            f"timestamp={self.timestamp} asks={self.asks} bids={self.bids}>"
+            f"timestamp='{self.timestamp}' asks={self.asks} bids={self.bids}>"
 
     def __str__(self) -> str:
         return f"{self.__len__()} orders: {self.market} @ {self.timestamp}"
-
 
 
 class TransactionHashData:
@@ -298,12 +299,16 @@ class TransactionHashData:
     owner: str
     progress: str
     status: str
-    timestamp: int
+    timestamp: datetime
     tx_hash: str
     updated_at: int
 
     def __init__(self, **data):
         for k in data.keys():
+            if k == "timestamp":
+                self.timestamp = datetime.fromtimestamp(data[k] / 1000)
+                continue
+            
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
@@ -311,7 +316,7 @@ class TransactionHashData:
             f"owner='{self.owner}' status='{self.status}' " + \
             f"progress='{self.progress}' fee_token_symbol={self.fee_token_symbol} " + \
             f"fee_amount='{self.fee_amount}' block_id={self.block_id} " + \
-            f"updated_at={self.updated_at} timestamp={self.timestamp}" + \
+            f"updated_at={self.updated_at} timestamp='{self.timestamp}' " + \
             f"index_in_block={self.index_in_block} id={self.id} " + \
             f"block_num={self.block_num}>"
     
