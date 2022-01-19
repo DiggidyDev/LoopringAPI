@@ -143,6 +143,22 @@ class TransactionHashData(_BaseTransaction):
             f"block_num={self.block_num}>"
 
 
+class TransferHashData(DepositHashData):
+
+    fee_amount: int
+    fee_token_symbol: str
+    memo: str
+    receiver: int
+    receiver_address: str
+    sender_address: str
+    tx_type: str
+
+    def __init__(self, **data):
+        super().__init__(**data)
+    
+    def __str__(self) -> str:
+        return self.hash
+
 
 # TODO: Redesign these classes and inheritances to fix unwanted intellisense
 #       suggestions (e.g. '.owner')
