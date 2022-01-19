@@ -2,10 +2,9 @@ import hashlib
 import json
 import urllib.parse
 
-from aiohttp import ClientResponse
 from pyblake2 import blake2b
 
-from ...enums import Endpoints, IntSig, StrSig
+from ...enums import IntSig
 from ...request import Request
 from ..ethsnarks.eddsa import PoseidonEdDSA, PureEdDSA, Signature, _SignatureScheme
 from ..ethsnarks.field import FQ
@@ -141,4 +140,52 @@ class OrderEDDSASign(EDDSASign):
             int(order.get("taker", "0x0"), 16)
         ]
 
+
+class TransferEDDSASign(EDDSASign):
+    def __init__(self, private_key):
+        super().__init__(
+            poseidon_params(
+                IntSig.SNARK_SCALAR_FIELD, 13, 6, 53, b"poseidon", 5, security=128
+                ),
+            private_key=private_key
+        )
+
+    def serialise(self, transfer):
+        return [
+            int(transfer["exchange"], 16),
+            int(transfer["payerId"]),
+            int(transfer["payeeId"]),
+            int(transfer["token"]["tokenId"]),
+            int(transfer["token"]["volume"]),
+            int(transfer["maxFee"]["tokenId"]),
+            int(transfer["maxFee"]["volume"]),
+            int(transfer["payeeAddr"], 16),
+            0, #int(transfer.get("dualAuthKeyX", "0"),16),
+            0, #int(transfer.get("dualAuthKeyY", "0"),16),
+            int(transfer["validUntil"]),
+            int(transfer["storageId"])
+        ]
+
+
+class WithdrawalEDDSASign(EDDSASign):
+    def __init__(self, private_key):
+        super().__init__(
+            poseidon_params(
+                IntSig.SNARK_SCALAR_FIELD, 10, 6, 53, b"poseidon", 5, security=128
+            ),
+            private_key=private_key
+        )
+
+    def serialise(self, withdraw):
+        return [
+            int(withdraw["exchange"], 16),
+            int(withdraw["accountId"]),
+            int(withdraw["token"]["tokenId"]),
+            int(withdraw["token"]["volume"]),
+            int(withdraw["maxFee"]["tokenId"]),
+            int(withdraw["maxFee"]["volume"]),
+            int(withdraw["onChainDataHash"], 16),
+            int(withdraw["validUntil"]),
+            int(withdraw["storageId"]),
+        ]
 
