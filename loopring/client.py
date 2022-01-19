@@ -1198,7 +1198,7 @@ class Client:
                 "volume": token.volume
             },
             "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds", True)
+            "validSince": validate_timestamp(valid_since, "seconds")
         })
 
         request = Request(
@@ -1277,6 +1277,8 @@ class Client:
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
             valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
                 time, in seconds.
+            valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
+                time, in seconds.
 
         Returns:
             :class:`~loopring.order.PartialOrder`: The order just submitted.
@@ -1332,7 +1334,7 @@ class Client:
             "taker": taker,
             "tradeChannel": trade_channel,
             "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds", True)
+            "validSince": validate_timestamp(valid_since, "seconds")
         })
 
         request = Request(
