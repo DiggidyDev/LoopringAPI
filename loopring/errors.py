@@ -301,3 +301,9 @@ class UserNotFound(LoopringError):
         if not message:
             message = "User wasn't found."
         super().__init__(message)
+
+
+class ValidationException(LoopringError):
+
+    def __init__(self, message: str):
+        super().__init__(message)
