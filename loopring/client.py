@@ -55,25 +55,31 @@ class Client:
     account_id: int
     address: str
     api_key: str
-    endpoint: ENDPOINT
-    exchange: Exchange
-    handle_errors: bool
+    nonce: int
     private_key: str
     publicX: str
     publicY: str
 
+    # misc.
+    endpoint: ENDPOINT
+    exchange: Exchange
+    handle_errors: bool
+    offchain_ids: list = [0] * 2 ** 16
+    order_ids: list    = [0] * 2 ** 16
+
     def __init__(self,
-                account_id: int=None,
-                api_key: str=None,
-                endpoint: ENDPOINT=None,
-                *,
-                address: str=None,
-                handle_errors: bool=True,
-                private_key: str=None,
-                publicX: str=None,
-                publicY: str=None,
-                **config
-                ):
+            account_id: int=None,
+            api_key: str=None,
+            endpoint: ENDPOINT=None,
+            *,
+            address: str=None,
+            handle_errors: bool=True,
+            nonce: int=None,
+            private_key: str=None,
+            publicX: str=None,
+            publicY: str=None,
+            **config
+        ):
         self.__exchange_domain_initialised = False
         self.__handle_errors = handle_errors
         
@@ -88,9 +94,12 @@ class Client:
         if not (cfg.get("endpoint") or endpoint):
             raise InvalidArguments("Missing endpoint from config.")
         
+        if not (cfg.get("nonce") or endpoint):
+            raise InvalidArguments("Missing nonce from config.")
+        
         if not (cfg.get("private_key") or private_key):
             raise InvalidArguments("Missing Private Key from config.")
-        
+
         if not (cfg.get("publicX") or publicX):
             raise InvalidArguments("Missing publicX from config.")
         
@@ -101,9 +110,15 @@ class Client:
         self.address     = cfg.get("address", address)
         self.api_key     = cfg.get("api_key", api_key)
         self.endpoint    = cfg.get("endpoint", endpoint)
+        self.nonce       = cfg.get("nonce", nonce)
         self.private_key = cfg.get("private_key", private_key)
         self.publicX     = cfg.get("publicX", publicX)
         self.publicY     = cfg.get("publicY", publicY)
+
+        self.chain_id = 5  # Testnet
+
+        if self.endpoint == ENDPOINT.MAINNET:
+            self.chain_id = 1
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
