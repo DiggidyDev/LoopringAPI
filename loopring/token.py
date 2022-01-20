@@ -85,6 +85,43 @@ class OrderAmount:
         return auto_repr(self)
 
 
+class OrderInfo:
+    """An OrderInfo model."""
+
+    maker_rate: int
+    min_amount: str
+    taker_rate: int
+
+    def __init__(self,  **data):
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
+
+
+class RateInfo:
+    """A RateInfo model."""
+
+    base_order_info: OrderInfo
+    discount: float
+    market_order_info: OrderAmount
+    token_symbol: str
+    user_order_info: OrderInfo
+
+    def __init__(self, **data):
+        for k in data.keys():
+            if "market" in k:
+                setattr(self, to_snake_case(k), OrderAmount(**data[k]))
+            elif "Order" in k:
+                setattr(self, to_snake_case(k), OrderInfo(**data[k]))
+            else:
+                setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
+
+
 class Price:
     """A Price model.
 
