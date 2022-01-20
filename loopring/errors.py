@@ -103,6 +103,14 @@ class InvalidArguments(LoopringError):
         super().__init__(message)
 
 
+class InvalidBlock(LoopringError):
+
+    def __init__(self, message: str=None):
+        if not message:
+            message = "Block doesn't exist or wasn't found."
+        super().__init__(message)
+
+
 class InvalidExchangeID(LoopringError):
 
     def __init__(self, message: str=None):

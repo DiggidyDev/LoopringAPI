@@ -38,6 +38,7 @@ class Mappings:
         ERR.INVALID_ACCOUNT_ID: InvalidAccountID,
         ERR.INVALID_API_KEY: InvalidAPIKey,
         ERR.INVALID_ARGUMENTS: InvalidArguments,
+        ERR.INVALID_BLOCK: InvalidBlock,
         ERR.INVALID_EXCHANGE_ID: InvalidExchangeID,
         ERR.INVALID_NONCE: InvalidNonce,
         ERR.INVALID_ORDER: InvalidOrder,

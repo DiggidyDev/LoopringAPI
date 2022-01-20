@@ -66,6 +66,7 @@ class ErrorCodes(IntEnum):
     # Orders, Transaction histories
     EMPTY_USER = 107001
     EMPTY_ORDERHASH = 107002
+    INVALID_BLOCK = 103011  # Undocumented error code
     NON_EXISTENT_ORDER = 107003
 
     # Orders, Market, AMM Pools
