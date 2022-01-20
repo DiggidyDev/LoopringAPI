@@ -3,7 +3,7 @@ import json
 import time
 from asyncio.events import AbstractEventLoop
 from datetime import datetime
-from typing import List, Sequence, Union
+from typing import List, Sequence, Tuple, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
@@ -14,7 +14,7 @@ from .errors import *
 from .exchange import DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
-from .token import Fee, Price, Token, TokenConfig
+from .token import Fee, Price, Rate, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
@@ -1180,11 +1180,63 @@ class Client:
 
             self.__exchange_domain_initialised = True
 
+    # TODO: Mapping for request types!
     async def query_order_fee(self,
         *,
         account_id: int=None,
+        amount: str=None,
+        request_type: int=1,
+        token_symbol: str="LRC") -> Tuple[str, List[Fee]]:
+        """Return a fee amount.
+
+        Args:
+            account_id (int): ...
+            amount (str): ...
+            request_type (int): 0=Order, 1=Offchain Withdrawal, 2=Update Account, \
+                3=Transfer, 4=Fast Offchain Withdrawal, 5=Open Account, 6=AMM Exit, \
+                7=Deposit, 8=AMM Join
+            token_symbol: ...
+
+        Returns:
+            Tuple[str, List[:obj:`~loopring.token.Fee`]]: ...
+
+        Raises:
+            UnknownError: ... .
+
+        """
+
+        url = self.endpoint + PATH.USER_OFFCHAIN_FEE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "amount": amount,
+            "requestType": request_type,
+            "tokenSymbol": token_symbol
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            fees = []
+
+            for f in content["fees"]:
+                fees.append(Fee(**f))
+
+            return content["gasPrice"], fees
+
+    async def query_order_rates(self,
+        *,
+        account_id: int=None,
         market: str="LRC-ETH",
-        token: Token) -> Fee:
+        token: Token) -> Rate:
         """Query an order fee on a market for a given token and volume.
 
         Args:
@@ -1220,12 +1272,12 @@ class Client:
             if self.handle_errors:
                 raise_errors_in(content)
             
-            fee_content: dict = content.pop("feeRate")
-            fee_content.update(content)
+            rate_content: dict = content.pop("feeRate")
+            rate_content.update(content)
 
-            fee = Fee(**fee_content)
+            rate = Rate(**rate_content)
 
-            return fee
+            return rate
 
     async def submit_internal_transfer(self,
         *,

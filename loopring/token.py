@@ -6,7 +6,25 @@ from .util.mappings import Mappings
 
 
 class Fee:
-    """A fee model from a query."""
+    """A fee model for a query."""
+
+    discount: float
+    fee: int
+    token: str
+
+    def __init__(self, **data) -> None:
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<token='{self.token}' discount={self.discount} fee={self.fee}>"
+    
+    def __str__(self) -> str:
+        return f"{self.fee}"
+
+
+class Rate:
+    """A rate model for a query."""
 
     gas_price: int
     maker_rate: int
