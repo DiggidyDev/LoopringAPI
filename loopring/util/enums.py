@@ -109,6 +109,7 @@ class Paths(str, Enum):
     """All paths available on the API."""
 
     ACCOUNT = "/api/v3/account"
+    AMM_BALANCE = "/api/v3/amm/balance"
     AMM_POOLS = "/api/v3/amm/pools"
     API_KEY = "/api/v3/apiKey"
     BLOCK_INFO = "/api/v3/block/getBlock"
