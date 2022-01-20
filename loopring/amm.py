@@ -1,14 +1,14 @@
-from typing import List
+from typing import List, Union
 
 from .token import Token
 from .util.helpers import auto_repr, to_snake_case
 
 
-class AMMPoolPrecisions:
-    """An AMMPoolPrecisions model."""
+class PoolPrecisions:
+    """An PoolPrecisions model."""
 
     amount: int
-    price: int  # price *precision*
+    price: int  # price precision (aka. dp)
 
     def __init__(self, **data):
         for k in data.keys():
@@ -18,11 +18,11 @@ class AMMPoolPrecisions:
         return auto_repr(self)
 
 
-class AMMPoolTokens:
-    """An AMMPoolTokens model."""
+class PoolTokens:
+    """An PoolTokens model."""
 
-    lp: int
-    pooled: List[int]  # Sequence matters!
+    lp: Union[int, Token]
+    pooled: List[Union[int, Token]]  # Sequence matters!
 
     def __init__(self, **data):
         for k in data.keys():
@@ -30,6 +30,28 @@ class AMMPoolTokens:
     
     def __repr__(self) -> str:
         return auto_repr(self)
+    
+    @classmethod
+    def from_tokens(cls, *, t1: Token, t2: Token, minimum_lp: Token):
+        """Used to help define AMM pool join parameters.
+        
+        Warning:
+            Order matters here. You'll be joining the AMM Pool like so; \
+                `AMM-t1-t2`
+        
+        Examples:
+            >>> eth = Token(id=0, volume=1000000000)
+
+        """
+        return cls(**{"lp": minimum_lp, "pooled": [t1, t2]})
+
+    def to_params(self):
+        params = {}
+
+        params["minimumLp"] = self.__dict__["lp"].to_params()
+        params["pooled"] = [t.to_params() for t in self.__dict__["pooled"]]
+
+        return params
 
 
 class Pool:
@@ -39,16 +61,16 @@ class Pool:
     fee_bips: int
     market: str
     name: str
-    precisions: AMMPoolPrecisions
-    token: AMMPoolTokens
+    precisions: PoolPrecisions
+    token: PoolTokens
     version: str
 
     def __init__(self, **data):
         for k in data.keys():
             if k == "precisions":
-                setattr(self, to_snake_case(k), AMMPoolPrecisions(**data[k]))
+                setattr(self, to_snake_case(k), PoolPrecisions(**data[k]))
             elif k == "token":
-                setattr(self, to_snake_case(k), AMMPoolTokens(**data[k]))
+                setattr(self, to_snake_case(k), PoolTokens(**data[k]))
             else:
                 setattr(self, to_snake_case(k), data[k])
     

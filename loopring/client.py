@@ -11,18 +11,19 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
-from .amm import Pool, PoolSnapshot
+from .amm import Pool, PoolSnapshot, PoolTokens
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Fee, Price, Rate, RateInfo, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
+from .util.enums import IntSig
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash
-from .util.sdk.sig.eddsa import OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
+from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash
+from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -53,28 +54,35 @@ class Client:
 
     """
 
+    # Account annotations
     account_id: int
     address: str
     api_key: str
-    endpoint: ENDPOINT
-    exchange: Exchange
-    handle_errors: bool
+    nonce: int
     private_key: str
     publicX: str
     publicY: str
 
+    # misc.
+    endpoint: ENDPOINT
+    exchange: Exchange
+    handle_errors: bool
+    offchain_ids: list = [0] * 2 ** 16
+    order_ids: list    = [0] * 2 ** 16
+
     def __init__(self,
-                account_id: int=None,
-                api_key: str=None,
-                endpoint: ENDPOINT=None,
-                *,
-                address: str=None,
-                handle_errors: bool=True,
-                private_key: str=None,
-                publicX: str=None,
-                publicY: str=None,
-                **config
-                ):
+            account_id: int=None,
+            api_key: str=None,
+            endpoint: ENDPOINT=None,
+            *,
+            address: str=None,
+            handle_errors: bool=True,
+            nonce: int=None,
+            private_key: str=None,
+            publicX: str=None,
+            publicY: str=None,
+            **config
+        ):
         self.__exchange_domain_initialised = False
         self.__handle_errors = handle_errors
         
@@ -89,9 +97,12 @@ class Client:
         if not (cfg.get("endpoint") or endpoint):
             raise InvalidArguments("Missing endpoint from config.")
         
+        if not (cfg.get("nonce") or endpoint):
+            raise InvalidArguments("Missing nonce from config.")
+        
         if not (cfg.get("private_key") or private_key):
             raise InvalidArguments("Missing Private Key from config.")
-        
+
         if not (cfg.get("publicX") or publicX):
             raise InvalidArguments("Missing publicX from config.")
         
@@ -102,9 +113,15 @@ class Client:
         self.address     = cfg.get("address", address)
         self.api_key     = cfg.get("api_key", api_key)
         self.endpoint    = cfg.get("endpoint", endpoint)
+        self.nonce       = cfg.get("nonce", nonce)
         self.private_key = cfg.get("private_key", private_key)
         self.publicX     = cfg.get("publicX", publicX)
         self.publicY     = cfg.get("publicY", publicY)
+
+        self.chain_id = 5  # Testnet
+
+        if self.endpoint == ENDPOINT.MAINNET:
+            self.chain_id = 1
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
@@ -275,11 +292,20 @@ class Client:
 
             if self.handle_errors:
                 raise_errors_in(content)
-            
+
             pools = []
 
             for p in content["pools"]:
-                pools.append(Pool(**p))
+                pool = Pool(**p)
+
+                # TODO: Storage IDs and such
+                EIP712.init_amm_env(
+                    name=pool.name,
+                    version=pool.version,
+                    chain_id=self.chain_id,
+                    verifying_contract=pool.address
+                )
+                pools.append(pool)
             
             return pools
 
@@ -671,7 +697,12 @@ class Client:
             return orders
 
     # TODO: Return obj instead of dict?
-    async def get_next_storage_id(self, sell_token_id: Union[int, Token]=None) -> dict:
+    async def get_next_storage_id(self,
+            *,
+            account_id: int=None,
+            max_next: int=None,
+            sell_token_id: Union[int, Token]
+        ) -> dict:
         """Get the next storage ID.
 
         Fetches the next order ID for a given sold token. If the need
@@ -700,21 +731,18 @@ class Client:
 
         """
 
-        if not sell_token_id:
-            raise InvalidArguments("Missing 'sellTokenID' argument.")
-
         if isinstance(sell_token_id, Token):
-            sell_token_id = Token.id
+            sell_token_id = sell_token_id.id
 
         url = self.endpoint + PATH.STORAGE_ID
         headers = {
             "X-API-KEY": self.api_key
         }
-        params = {
-            "accountId": self.account_id,
+        params = clean_params({
+            "accountId": account_id or self.account_id,
             "sellTokenId": sell_token_id,
-            "maxNext": 0
-        }
+            "maxNext": max_next
+        })
 
         async with self._session.get(url, headers=headers, params=params) as r:
             raw_content = await r.read()
@@ -723,6 +751,9 @@ class Client:
 
             if self.handle_errors:
                 raise_errors_in(content)
+            
+            self.order_ids[sell_token_id]    = content["orderId"]
+            self.offchain_ids[sell_token_id] = content["offchainId"]
 
             return content
 
@@ -981,7 +1012,8 @@ class Client:
             token_confs = []
 
             for t in content:
-                token_confs.append(TokenConfig(**t))
+                token_config = TokenConfig(**t)
+                token_confs.append(token_config)
             
             return token_confs
 
@@ -1283,6 +1315,75 @@ class Client:
 
             self.__exchange_domain_initialised = True
 
+    async def join_amm_pool(self,
+        *,
+        fee: Union[int, Fee],
+        join_tokens: PoolTokens,
+        owner: str=None,
+        pool: Union[str, Pool],
+        storage_ids: List[int]=None,
+        valid_until: Union[int, datetime]=None) -> Transfer:
+        """Join an AMM Pool."""
+
+        supplied_storage_ids = True
+
+        if valid_until is None:
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        
+        if not storage_ids:
+            supplied_storage_ids = False
+            assert len(join_tokens.pooled) == 2
+
+            storage_ids = [
+                self.offchain_ids[join_tokens.pooled[0].id],
+                self.offchain_ids[join_tokens.pooled[1].id]
+            ]
+
+        url = self.endpoint + PATH.AMM_JOIN
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        payload = clean_params({
+            "fee": fee if isinstance(fee, int) else fee.fee,
+            "joinTokens": join_tokens.to_params(),
+            "owner": owner or self.address,
+            "poolAddress": pool if isinstance(pool, str) else pool.address,
+            "storageIds": storage_ids,
+            "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
+        })
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.AMM_JOIN,
+            payload=payload
+        )
+
+        message = generate_amm_pool_join_EIP712_hash(request.payload)
+
+        if not supplied_storage_ids:
+            self.offchain_ids[join_tokens.pooled[0].id] += 2
+            self.offchain_ids[join_tokens.pooled[1].id] += 2
+
+        helper = MessageEDDSASign(private_key=self.private_key)
+        payload["eddsaSignature"] = helper.sign(message)
+
+        print(payload)
+        exit()
+
+        async with self._session.post(url, headers=headers, payload=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transfer = Transfer(**content)
+
+            return transfer
+
     # TODO: Mapping for request types!
     async def query_order_fee(self,
         *,
@@ -1438,7 +1539,7 @@ class Client:
         payee_address: str,
         token: Token,
         max_fee: Token,
-        storage_id: int,
+        storage_id: int=None,
         valid_until: Union[int, datetime]=None,
         valid_since: Union[int, datetime]=None,
         counter_factual_info: CounterFactualInfo=None,
@@ -1477,6 +1578,10 @@ class Client:
 
         if isinstance(exchange, Exchange):
             exchange = str(exchange)
+        
+        if storage_id is None:
+            storage_id = self.offchain_ids[token.id]
+            self.offchain_ids[token.id] += 2
 
         if not valid_until:
             # Default to 2 months:
@@ -1491,20 +1596,14 @@ class Client:
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
             "exchange": exchange or str(self.exchange),
-            "maxFee": {
-                "tokenId": max_fee.id,
-                "volume": max_fee.volume
-            },
+            "maxFee": max_fee.to_params(),
             "memo": memo,
             "payeeAddr": payee_address,
             "payeeId": payee_id,
             "payerAddr": payer_address,
             "payerId": payer_id,
             "storageId": storage_id,
-            "token": {
-                "tokenId": token.id,
-                "volume": token.volume
-            },
+            "token": token.to_params(),
             "validSince": validate_timestamp(valid_since, "seconds"),
             "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
@@ -1557,7 +1656,7 @@ class Client:
         owner: str,
         max_fee: Token,
         min_gas: int=0,
-        storage_id: int,
+        storage_id: int=None,
         to: str,
         token: Token,
         valid_since: Union[int, datetime]=None,
@@ -1570,6 +1669,10 @@ class Client:
             # for information about order validity and time
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
         valid_since = int(datetime.timestamp(datetime.now()))
+
+        if storage_id is None:
+            storage_id = self.offchain_ids[token.id]
+            self.offchain_ids[token.id] += 2
 
         url = self.endpoint + PATH.USER_WITHDRAWALS
 
@@ -1588,17 +1691,11 @@ class Client:
             "hashApproved": hash_approved,
             "onChainDataHash": onchain_data_hash,
             "owner": owner,
-            "maxFee": {
-                "tokenId": max_fee.id,
-                "volume": max_fee.volume
-            },
+            "maxFee": max_fee.to_params(),
             "minGas": min_gas,
             "storageId": storage_id,
             "to": to,
-            "token": {
-                "tokenId": token.id,
-                "volume": token.volume
-            },
+            "token": token.to_params(),
             "validSince": validate_timestamp(valid_since, "seconds"),
             "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
@@ -1642,7 +1739,7 @@ class Client:
 
     async def submit_order(self,
                         *,
-                        affiliate: str=None,
+                        affiliate: int=66825,
                         all_or_none: str=False,
                         buy_token: Token,
                         client_order_id: str=None,
@@ -1652,7 +1749,6 @@ class Client:
                         order_type: str=None,
                         pool_address: str=None,
                         sell_token: Token,
-                        storage_id: int,
                         taker: str=None,
                         trade_channel: str=None,
                         valid_since: Union[int, datetime]=None,
@@ -1680,9 +1776,6 @@ class Client:
             pool_address (str): The AMM Pool address if order type is `'AMM'`.
             sell_token (:obj:`~loopring.token.Token`): Wrapper object used \
                 to describe a token associated with a certain quantity.
-            storage_id (int): The unique ID of the L2 Merkle tree storage \
-                slot where the burn made in order to exit the pool will be \
-                stored or has been stored.
             taker (str): Used by the P2P order, where the user needs to \
                 specify the taker's address.
             trade_channel (str): The channel to be used when ordering: \
@@ -1719,7 +1812,7 @@ class Client:
             OrderUnsupportedMarket: ... .
             UnknownError: ... .
             UnsupportedTokenID: ... .
-        
+
         """
 
         if not (self.__exchange_domain_initialised or exchange):
@@ -1731,6 +1824,11 @@ class Client:
             # for information about order validity and time
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
         valid_since = int(datetime.timestamp(datetime.now()))
+
+        order_id = self.order_ids[sell_token.id]
+        assert order_id < IntSig.MAX_ORDER_ID
+
+        self.order_ids[sell_token.id] += 2
 
         url = self.endpoint + PATH.ORDER
 
@@ -1757,7 +1855,7 @@ class Client:
                 "tokenId": sell_token.id,
                 "volume": sell_token.volume
             },
-            "storageId": storage_id,
+            "storageId": order_id,
             "taker": taker,
             "tradeChannel": trade_channel,
             "validSince": validate_timestamp(valid_since, "seconds"),

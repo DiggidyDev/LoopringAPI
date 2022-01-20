@@ -1,15 +1,15 @@
 import asyncio
 from datetime import timedelta
+import json
 
 import loopring
 from loopring.util.enums import Endpoints
 
 
-cfg = {
-    "account_id": 12345,
-    "api_key": "",
-    "endpoint": Endpoints.MAINNET
-}
+with open("account.json", "r") as fp:
+    cfg = json.load(fp)
+
+cfg["endpoint"] = Endpoints.MAINNET
 
 client = loopring.Client(handle_errors=True, config=cfg)
 

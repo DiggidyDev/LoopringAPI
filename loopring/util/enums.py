@@ -110,6 +110,7 @@ class Paths(str, Enum):
 
     ACCOUNT = "/api/v3/account"
     AMM_BALANCE = "/api/v3/amm/balance"
+    AMM_JOIN = "/api/v3/amm/join"
     AMM_POOLS = "/api/v3/amm/pools"
     API_KEY = "/api/v3/apiKey"
     BLOCK_INFO = "/api/v3/block/getBlock"
@@ -153,6 +154,8 @@ class IntSig(IntEnum):
     JUBJUB_L = JUBJUB_E // JUBJUB_C
     JUBJUB_A = 168700
     JUBJUB_D = 168696
+
+    MAX_ORDER_ID = 1 << 32
 
     MONT_A = 168698
     MONT_A24 = int((MONT_A + 2) / 4)

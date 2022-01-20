@@ -187,6 +187,11 @@ class Token:
     
     def __repr__(self) -> str:
         return auto_repr(self)
+    
+    def to_params(self):
+        """Converting any attributes back to the fields required for requests."""
+
+        return {"tokenId": self.__dict__["id"], "volume": self.__dict__["volume"]}
 
 
 class TokenConfig:
