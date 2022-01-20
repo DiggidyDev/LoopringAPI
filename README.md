@@ -31,6 +31,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [ ] Add loads of examples!
 - [ ] Make some sense out of [how storage IDs work](https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#storage).
 - [ ] Ratelimits exist, but information is scarce... Work on implementing async ratelimiting anyway!
+- [ ] Synchronous version of the wrapper?
 
 ## Honourable mentions:
 
