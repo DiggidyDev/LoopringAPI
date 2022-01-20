@@ -155,6 +155,8 @@ class IntSig(IntEnum):
     JUBJUB_A = 168700
     JUBJUB_D = 168696
 
+    MAX_ORDER_ID = 1 << 32
+
     MONT_A = 168698
     MONT_A24 = int((MONT_A + 2) / 4)
     MONT_B = 1
