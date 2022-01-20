@@ -129,6 +129,7 @@ class Paths(str, Enum):
     USER_DEPOSITS = "/api/v3/user/deposits"
     USER_OFFCHAIN_FEE = "/api/v3/user/offchainFee"
     USER_ORDER_FEE = "/api/v3/user/orderFee"
+    USER_ORDER_RATES = "/api/v3/user/orderUserRateAmount"
     USER_PASSWORD_RESETS = "/api/v3/user/updateInfo"
     USER_REGISTRATION = "/api/v3/user/createInfo"
     USER_TRANSFERS = "/api/v3/user/transfers"

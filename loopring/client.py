@@ -14,7 +14,7 @@ from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
-from .token import Fee, Price, Rate, Token, TokenConfig
+from .token import Fee, Price, Rate, RateInfo, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
@@ -1269,6 +1269,51 @@ class Client:
                 fees.append(Fee(**f))
 
             return content["gasPrice"], fees
+
+    async def query_order_minimum_fees(self,
+        *,
+        account_id: int=None,
+        market: str="LRC-ETH") -> Tuple[str, datetime, List[RateInfo]]:
+        """Get the current trading pair (market)'s  fees.
+        
+        Args:
+            account_id (int): ...
+            market (str): ...
+        
+        Returns:
+            Tuple[str, :class:`~datetime.datetime`, List[:obj:`~loopring.token.RateInfo`]]: ...
+
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.USER_ORDER_RATES
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "market": market
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            rates = []
+            
+            for a in content["amounts"]:
+                rates.append(RateInfo(**a))
+
+            cache_expiry = datetime.fromtimestamp(content["cacheOverdueAt"])
+
+            return content["gasPrice"], cache_expiry, rates
 
     async def query_order_rates(self,
         *,
