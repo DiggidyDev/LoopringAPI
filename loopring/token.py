@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from .util.helpers import to_snake_case
+from .util.helpers import auto_repr, to_snake_case
 from .util.mappings import Mappings
 
 
@@ -17,7 +17,7 @@ class Fee:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<token='{self.token}' discount={self.discount} fee={self.fee}>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return f"{self.fee}"
@@ -36,8 +36,7 @@ class Rate:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<symbol='{self.symbol}' gas_price={self.gas_price} " + \
-            f"maker_rate={self.maker_rate} taker_rate={self.taker_rate}>"
+        return auto_repr(self)
 
     def __str__(self) -> str:
         return f"{self.gas_price}"
@@ -60,7 +59,7 @@ class GasAmount:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<deposit='{self.deposit}' distribution='{self.distribution}'>"
+        return auto_repr(self)
 
 
 class OrderAmount:
@@ -83,8 +82,7 @@ class OrderAmount:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<dust='{self.dust}' maximum='{self.maximum}' " + \
-            f"minimum='{self.minimum}'>"
+        return auto_repr(self)
 
 
 class Price:
@@ -123,8 +121,7 @@ class Price:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<price='{self.price}' currency='{self.currency}' " + \
-            f"symbol='{self.symbol}' updated_at='{self.updated_at}'>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         currency_map = Mappings.CURRENCY_MAPPINGS
@@ -150,6 +147,9 @@ class Token:
     def __init__(self, *, id: int=None, volume: int=None):
         self.id = id
         self.volume = volume
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
 
 
 class TokenConfig:
@@ -197,17 +197,9 @@ class TokenConfig:
 
             else:
                 setattr(self, to_snake_case(k), data[k])
-            
+    
     def __repr__(self) -> str:
-        return f"<symbol='{self.symbol}' name='{self.name}' " + \
-            f"token_id={self.token_id} type='{self.type}' " + \
-            f"address='{self.address}' enabled={self.enabled} " + \
-            f"decimals={self.decimals} precision={self.precision} " + \
-            f"precision_for_order={self.precision_for_order} " + \
-            f"fast_withdraw_limit='{self.fast_withdraw_limit}' " + \
-            f"lucky_token_amounts={repr(self.lucky_token_amounts)} " + \
-            f"order_amounts={repr(self.order_amounts)} " + \
-            f"gas_amounts={repr(self.gas_amounts)}>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return f"{self.name} ({self.symbol})"

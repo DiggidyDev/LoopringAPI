@@ -69,13 +69,7 @@ class Exchange:
                 setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<exchange_address='{self.exchange_address}' " + \
-            f"deposit_address='{self.deposit_address}' chain_id={self.chain_id} " + \
-            f"onchain_fees={self.onchain_fees} update_fees={self.update_fees} " + \
-            f"withdrawal_fees={self.withdrawal_fees} " + \
-            f"fast_withdrawal_fees={self.fast_withdrawal_fees} " + \
-            f"open_account_fees={self.open_account_fees} " + \
-            f"transfer_fees={self.transfer_fees} amm_exit_fees={self.amm_exit_fees}>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.exchange_address
@@ -102,6 +96,9 @@ class _BaseTransaction:
 
             setattr(self, to_snake_case(k), data[k])
     
+    def __repr__(self) -> str:
+        return auto_repr(self)
+    
     def __str__(self) -> str:
         return self.tx_hash
 
@@ -112,16 +109,13 @@ class DepositHashData(_BaseTransaction):
     symbol: str
 
     def __init__(self, **data):
+        self.__annotations__.update(super().__annotations__)
+
         for k in data.keys():
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
-            f"amount={self.amount} status='{self.status}' " + \
-            f"progress='{self.progress}' symbol='{self.symbol}' " + \
-            f"block_num='{self.block_num}' block_id={self.block_id} " + \
-            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
-            f"index_in_block={self.index_in_block} id={self.id}>"
+        return auto_repr(self)
 
 
 class TransactionHashData(_BaseTransaction):
@@ -131,16 +125,12 @@ class TransactionHashData(_BaseTransaction):
     owner: str
 
     def __init__(self, **data):
+        self.__annotations__.update(super().__annotations__)
+
         super().__init__(**data)
     
     def __repr__(self) -> str:
-        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
-            f"owner='{self.owner}' status='{self.status}' " + \
-            f"progress='{self.progress}' fee_token_symbol={self.fee_token_symbol} " + \
-            f"fee_amount='{self.fee_amount}' block_id={self.block_id} " + \
-            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
-            f"index_in_block={self.index_in_block} id={self.id} " + \
-            f"block_num={self.block_num}>"
+        return auto_repr(self)
 
 
 class TransferHashData(DepositHashData):
@@ -154,7 +144,12 @@ class TransferHashData(DepositHashData):
     tx_type: str
 
     def __init__(self, **data):
+        self.__annotations__.update(super().__annotations__)
+
         super().__init__(**data)
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.hash
@@ -170,14 +165,9 @@ class WithdrawalHashData(TransactionHashData, DepositHashData):
     tx_type: str
 
     def __init__(self, **data):
+        self.__annotations__.update(super().__annotations__)
+
         super().__init__(**data)
-    
+
     def __repr__(self) -> str:
-        return f"<hash='{self.hash}' tx_hash='{self.tx_hash}' " + \
-            f"tx_type='{self.tx_type}' status='{self.status}' " + \
-            f"progress='{self.progress}' fee_token_symbol={self.fee_token_symbol} " + \
-            f"fee_amount='{self.fee_amount}' block_id={self.block_id} " + \
-            f"updated_at='{self.updated_at}' timestamp='{self.timestamp}' " + \
-            f"index_in_block={self.index_in_block} id={self.id} " + \
-            f"block_num={self.block_num} distribute_hash='{self.distribute_hash}' " + \
-            f"fast_status='{self.fast_status}' request_id={self.request_id}>"
+        return auto_repr(self)

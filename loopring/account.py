@@ -1,4 +1,4 @@
-from .util.helpers import to_snake_case
+from .util.helpers import auto_repr, to_snake_case
 
 
 class Account:
@@ -23,9 +23,7 @@ class Account:
                 setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<account_id={self.account_id} owner='{self.owner}' " + \
-            f"publicX='{self.publicX}' publicY='{self.publicY}' nonce={self.nonce} " + \
-            f"key_nonce={self.key_nonce} key_seed='{self.key_seed}' tags={self.tags}'>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.owner
@@ -63,9 +61,7 @@ class Balance:
                 setattr(self, to_snake_case(k), int(data[k]))
     
     def __repr__(self) -> str:
-        return f"<total={self.total} pending={repr(self.pending)} " + \
-            f"token_id={self.token_id} locked={self.locked} " + \
-            f"account_id={self.account_id}>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.total
