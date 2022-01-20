@@ -110,6 +110,7 @@ class Paths(str, Enum):
 
     ACCOUNT = "/api/v3/account"
     API_KEY = "/api/v3/apiKey"
+    BLOCK_INFO = "/api/v3/block/getBlock"
     CANDLESTICK = "/api/v3/candlestick"
     DEPTH = "/api/v3/depth"
     EXCHANGES = "/api/v3/exchange/info"

@@ -11,7 +11,7 @@ from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
 from .errors import *
-from .exchange import DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
+from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Fee, Price, Rate, Token, TokenConfig
@@ -327,6 +327,44 @@ class Client:
                 prices.append(Price(currency=currency, **p))
             
             return prices
+
+    async def get_block(self,
+        *,
+        id_or_status: str="confirmed") -> Block:
+        """Get block info by ID or status.
+        
+        Args:
+            id_or_status (str): Any of the following; '`finalized`', '`confirmed`', \
+                '`12345`'. Defaults to '`confirmed`'.
+        
+        Returns:
+            :obj:`~loopring.exchange.Block`: ...
+        
+        Raises:
+            UnknownError: ...
+        
+        """
+
+        url = self.endpoint + PATH.BLOCK_INFO
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "id": id_or_status
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            block = Block(**content)
+
+            return block
 
     async def get_market_candlestick(self,
         market: str="LRC-ETH",
