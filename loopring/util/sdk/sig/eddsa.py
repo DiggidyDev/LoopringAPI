@@ -115,6 +115,27 @@ class UrlEDDSASign(EDDSASign):
         return "&".join([method, url, data])
 
 
+class MessageEDDSASign(EDDSASign):
+    def __init__(self, private_key):
+        super().__init__(
+            poseidon_params(
+                IntSig.SNARK_SCALAR_FIELD, 2, 6, 53, b"poseidon", 5, security=128
+            ),
+            private_key=private_key
+        )
+
+    def hash(self, eip712_hash_bytes):
+        return self.serialise(eip712_hash_bytes)
+
+    def serialise(self, data):
+        if isinstance(data, bytes):
+            return int(data.hex(), 16) >> 3
+        elif isinstance(data, str):
+            return int(data, 16) >> 3
+        else:
+            raise TypeError(f"Unknown type {type(data)}")
+
+
 class OrderEDDSASign(EDDSASign):
 
     def __init__(self, private_key):

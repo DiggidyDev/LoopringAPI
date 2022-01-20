@@ -10,7 +10,7 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
-from .amm import Pool, PoolSnapshot
+from .amm import Pool, PoolSnapshot, PoolTokens
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -20,8 +20,8 @@ from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash
-from .util.sdk.sig.eddsa import OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
+from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash
+from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -289,11 +289,20 @@ class Client:
 
             if self.handle_errors:
                 raise_errors_in(content)
-            
+
             pools = []
 
             for p in content["pools"]:
-                pools.append(Pool(**p))
+                pool = Pool(**p)
+
+                # TODO: Storage IDs and such
+                EIP712.init_amm_env(
+                    name=pool.name,
+                    version=pool.version,
+                    chain_id=self.chain_id,
+                    verifying_contract=pool.address
+                )
+                pools.append(pool)
             
             return pools
 
@@ -1296,6 +1305,75 @@ class Client:
             )
 
             self.__exchange_domain_initialised = True
+
+    async def join_amm_pool(self,
+        *,
+        fee: Union[int, Fee],
+        join_tokens: PoolTokens,
+        owner: str=None,
+        pool: Union[str, Pool],
+        storage_ids: List[int]=None,
+        valid_until: Union[int, datetime]=None) -> Transfer:
+        """Join an AMM Pool."""
+
+        supplied_storage_ids = True
+
+        if valid_until is None:
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        
+        if not storage_ids:
+            supplied_storage_ids = False
+            assert len(join_tokens.pooled) == 2
+
+            storage_ids = [
+                self.offchain_ids[join_tokens.pooled[0].id],
+                self.offchain_ids[join_tokens.pooled[1].id]
+            ]
+
+        url = self.endpoint + PATH.AMM_JOIN
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        payload = clean_params({
+            "fee": fee if isinstance(fee, int) else fee.fee,
+            "joinTokens": join_tokens.to_params(),
+            "owner": owner or self.address,
+            "poolAddress": pool if isinstance(pool, str) else pool.address,
+            "storageIds": storage_ids,
+            "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
+        })
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.AMM_JOIN,
+            payload=payload
+        )
+
+        message = generate_amm_pool_join_EIP712_hash(request.payload)
+
+        if not supplied_storage_ids:
+            self.offchain_ids[join_tokens.pooled[0].id] += 2
+            self.offchain_ids[join_tokens.pooled[1].id] += 2
+
+        helper = MessageEDDSASign(private_key=self.private_key)
+        payload["eddsaSignature"] = helper.sign(message)
+
+        print(payload)
+        exit()
+
+        async with self._session.post(url, headers=headers, payload=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transfer = Transfer(**content)
+
+            return transfer
 
     # TODO: Mapping for request types!
     async def query_order_fee(self,
