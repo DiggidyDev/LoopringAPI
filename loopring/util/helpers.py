@@ -9,6 +9,24 @@ from ..errors import ValidationException
 from ..util.mappings import Mappings
 
 
+# TODO: Maybe do something like this for `setattr()` too?
+def auto_repr(obj: object):
+    """A lazy '__repr__()' substitute."""
+    attrs = []
+
+    for a in obj.__annotations__.keys():
+        try:
+            if isinstance(getattr(obj, a), datetime):
+                attrs.append(f"{a}='{getattr(obj, a)}'")
+            else:
+                attrs.append(f"{a}={repr(getattr(obj, a))}")
+
+        except AttributeError:
+            continue
+
+    return f"<{' '.join(attrs)}>"
+
+
 def clean_params(params: dict) -> dict:
     """Clean all NoneType parameters from a given dict.
     
@@ -110,6 +128,10 @@ def to_snake_case(camel: str) -> str:
     """
 
     snake = ""
+
+    # Edge cases: e.g. `accountID`, `storageID`
+    if len(camel) > 1 and camel[-1].isupper() and camel[-2].isupper():
+        camel = camel[:-1] + camel[-1].lower()
 
     for _ in list(camel):
         if _.isupper():
