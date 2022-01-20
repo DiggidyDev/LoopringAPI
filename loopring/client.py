@@ -10,6 +10,7 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
+from .amm import Pool
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -217,6 +218,34 @@ class Client:
             account = Account(**content)
 
             return account
+
+    async def get_amm_pool_configurations(self) -> List[Pool]:
+        """Get all AMM Pool configurations.
+        
+        Returns:
+            List[:obj:`~loopring.amm.Pool`]: ...
+        
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.AMM_POOLS
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            pools = []
+
+            for p in content["pools"]:
+                pools.append(Pool(**p))
+            
+            return pools
 
     async def get_api_key(self) -> str:
         """Get the API Key associated with an account.
