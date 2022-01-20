@@ -5,6 +5,26 @@ from .util.helpers import to_snake_case
 from .util.mappings import Mappings
 
 
+class Fee:
+    """A fee model from a query."""
+
+    gas_price: int
+    maker_rate: int
+    symbol: str
+    taker_rate: int
+
+    def __init__(self, **data):
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return f"<symbol='{self.symbol}' gas_price={self.gas_price} " + \
+            f"maker_rate={self.maker_rate} taker_rate={self.taker_rate}>"
+
+    def __str__(self) -> str:
+        return f"{self.gas_price}"
+
+
 class GasAmount:
     """Contains information about the gas amounts required by ETH L1 requests.
 
