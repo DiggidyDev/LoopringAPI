@@ -1,7 +1,9 @@
-from eip712_structs import EIP712Struct, Address, Boolean, Bytes, Int, String, Uint
 import eip712_structs
-
+from eip712_structs import Address, Bytes, EIP712Struct, Uint
+from hexbytes.main import HexBytes
 from web3 import Web3
+
+from ....token import Token
 
 
 class EIP712:
@@ -11,7 +13,11 @@ class EIP712:
     amm_pool_domains: dict = {}
 
     @classmethod
-    def init_env(cls, name, version, chain_id, verifying_contract):
+    def init_env(cls,
+        name="Loopring Protocol",
+        version="3.6.0",
+        chain_id=None,
+        verifying_contract=None):
         cls.exchange_domain = eip712_structs.make_domain(
             name=name,
             version=version,
@@ -52,7 +58,7 @@ def generate_transfer_EIP712_hash(payload: dict):
     class Transfer(EIP712Struct):
         pass
 
-    setattr(Transfer, "from", Address())
+    setattr(Transfer, "from", Address())  # because `from` is a reserved keyword
     Transfer.amount = Uint(96)
     Transfer.fee_token_id = Uint(16)
     Transfer.max_fee = Uint(96)
@@ -76,3 +82,67 @@ def generate_transfer_EIP712_hash(payload: dict):
         EIP712.exchange_domain.hash_struct(),
         transfer.hash_struct()
     )
+
+
+def generate_offchain_withdrawal_EIP712_hash(payload: dict):
+    """
+        struct Withdrawal
+        {
+            address owner;
+            uint32  accountID;
+            uint16  tokenID;
+            uint    amount;
+            uint16  feeTokenID;
+            uint    fee;
+            address to;
+            bytes32 extraDataHash;
+            uint    minGas;
+            uint32  validUntil;
+            uint32  storageID;
+        }
+    """
+
+    class Withdrawal(EIP712Struct):
+        owner = Address()
+        accountID = Uint(32)
+        tokenID = Uint(16)
+        amount = Uint(96)
+        feeTokenID = Uint(16)
+        maxFee = Uint(96)
+        to = Address()
+        extraData = Bytes()
+        minGas = Uint()
+        validUntil = Uint(32)
+        storageID = Uint(32)
+
+    withdrawal = Withdrawal(**{
+        "accountID"     : payload["accountId"],
+        "amount"        : int(payload["token"]["volume"]),
+        "extraData"     : bytes.fromhex(payload["extraData"].decode()),
+        "feeTokenID"    : payload["maxFee"]["tokenId"],
+        "maxFee"        : int(payload["maxFee"]["volume"]),
+        "minGas"        : int(payload["minGas"]),
+        "owner"         : payload["owner"],
+        "storageID"     : payload["storageId"],
+        "to"            : payload["to"],
+        "tokenID"       : payload["token"]["tokenId"],
+        "validUntil"    : payload["validUntil"]
+    })
+
+    return EIP712.hash_packed(
+        EIP712.exchange_domain.hash_struct(),
+        withdrawal.hash_struct()
+    )
+
+
+def generate_onchain_data_hash(*,
+    min_gas: int,
+    to: str,
+    extra_data: bytes):
+    return Web3.keccak(b"".join(
+        [
+            int(min_gas).to_bytes(32, "big"),
+            int(to, 16).to_bytes(20, "big"),
+            extra_data
+        ]
+    ))[:20]

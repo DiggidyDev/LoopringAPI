@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from .util.helpers import to_snake_case
+from .util.helpers import auto_repr, to_snake_case
 
 
 class Market:
@@ -17,11 +17,7 @@ class Market:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<market='{self.market}' enabled={self.enabled} " + \
-            f"base_token_id={self.base_token_id} " + \
-            f"quote_token_id={self.quote_token_id} " + \
-            f"orderbook_agg_levels={self.orderbook_agg_levels}" + \
-            f"precision_for_price={self.precision_for_price}>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.market
@@ -186,12 +182,7 @@ class Candlestick:
         self.start_time = datetime.fromtimestamp(int(start_time) / 1000)
     
     def __repr__(self) -> str:
-        # Not all attrs added - maybe add them all?
-        return f"<lowest_price='{self.lowest_price}' " + \
-            f"highest_price='{self.highest_price}' " + \
-            f"opening_price='{self.opening_price}' " + \
-            f"closing_price='{self.closing_price}' " + \
-            f"start_time='{self.start_time}'>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return f"High: {self.highest_price} Low: {self.lowest_price} " + \

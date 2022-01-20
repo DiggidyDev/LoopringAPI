@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List
 
-from .util.helpers import to_snake_case
+from .util.helpers import auto_repr, to_snake_case
 
 
 class CounterFactualInfo:
@@ -17,6 +17,9 @@ class CounterFactualInfo:
 
     def __init__(self):
         pass
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
 
 
 class Validity:
@@ -60,11 +63,9 @@ class Volume:
     def __init__(self, **data) -> None:
         for k in data:
             setattr(self, to_snake_case(k), data[k])
-    
+
     def __repr__(self) -> str:
-        return f"<base_amount='{self.base_amount}' " + \
-            f"base_filled='{self.base_filled}' fee='{self.fee}' " + \
-            f"quote_amount='{self.quote_amount}' quote_filled='{self.quote_filled}'>"
+        return auto_repr(self)
 
 
 class Transfer:
@@ -78,8 +79,7 @@ class Transfer:
             setattr(self, to_snake_case(k), data[k])
     
     def __repr__(self) -> str:
-        return f"<hash='{self.hash}' is_idempotent={self.is_idempotent} " + \
-            f"status='{self.status}'>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return self.hash
@@ -107,6 +107,8 @@ class PartialOrder(Transfer):
         if self._is_error(data):
             return
 
+        self.__annotations__.update(super().__annotations__)
+
         super().__init__(**data)
 
         for k in data.keys():
@@ -115,9 +117,8 @@ class PartialOrder(Transfer):
     def __repr__(self) -> str:
         if self._is_error():
             return "<Incomplete PartialOrder>"
-
-        return f"<hash='{self.hash}' id='{self.client_order_id}' " + \
-            f"is_idempotent={self.is_idempotent} status='{self.status}'>"
+    
+        return auto_repr(self)
     
     def __str__(self) -> str:
         if self._is_error():
@@ -191,6 +192,8 @@ class Order(PartialOrder):
         return super().__getattribute__(__name)
 
     def __init__(self, **data) -> None:
+        self.__annotations__.update(super().__annotations__)
+
         super().__init__(**data)
 
         if self._is_error(data):
@@ -210,10 +213,7 @@ class Order(PartialOrder):
         if self._is_error():
             return f"<Incomplete Order>"
 
-        return f"<hash='{self.hash}' id='{self.client_order_id}' " + \
-            f"side='{self.side}' market='{self.market}' price='{self.price}' " + \
-            f"order_type='{self.order_type}' trade_channel='{self.trade_channel}' " + \
-            f"status='{self.status}' validity={self.validity} volumes={self.volumes}>"
+        return auto_repr(self)
 
 
 class _OrderBookOrder:
@@ -230,8 +230,7 @@ class _OrderBookOrder:
         self.volume = int(volume)
     
     def __repr__(self) -> str:
-        return f"<price='{self.price}' quantity='{self.quantity}' " + \
-            f"size='{self.size}' volume='{self.size}'>"
+        return auto_repr(self)
     
     def __str__(self) -> str:
         return f"{self.quantity} {self.__class__.__name__.lower()}" + \
@@ -278,10 +277,9 @@ class OrderBook:
     
     def __len__(self) -> int:
         return sum(_.quantity for _ in [*self.asks, *self.bids])
-
+    
     def __repr__(self) -> str:
-        return f"<market='{self.market}' version='{self.version}' " + \
-            f"timestamp='{self.timestamp}' asks={self.asks} bids={self.bids}>"
+        return auto_repr(self)
 
     def __str__(self) -> str:
         return f"{self.__len__()} orders: {self.market} @ {self.timestamp}"

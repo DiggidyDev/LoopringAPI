@@ -3,25 +3,26 @@ import json
 import time
 from asyncio.events import AbstractEventLoop
 from datetime import datetime
-from typing import List, Sequence, Union
-import requests
+from typing import List, Sequence, Tuple, Union
 
 import aiohttp
+import requests
 from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
+from .amm import Pool, PoolSnapshot
 from .errors import *
-from .exchange import DepositHashData, Exchange, TransactionHashData, WithdrawalHashData
+from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
-from .token import Price, Token, TokenConfig
+from .token import Fee, Price, Rate, RateInfo, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import generate_transfer_EIP712_hash
-from .util.sdk.sig.eddsa import OrderEDDSASign, UrlEDDSASign
+from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash
+from .util.sdk.sig.eddsa import OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -56,6 +57,7 @@ class Client:
     address: str
     api_key: str
     endpoint: ENDPOINT
+    exchange: Exchange
     handle_errors: bool
     private_key: str
     publicX: str
@@ -73,6 +75,7 @@ class Client:
                 publicY: str=None,
                 **config
                 ):
+        self.__exchange_domain_initialised = False
         self.__handle_errors = handle_errors
         
         cfg = config.get("config", {})
@@ -217,6 +220,69 @@ class Client:
 
             return account
 
+    async def get_amm_pool_balance(self, address: str) -> PoolSnapshot:
+        """Get an AMM Pool's balance.
+        
+        Args:
+            address (str): ...
+        
+        Returns:
+            :obj:`~loopring.amm.PoolSnapshot
+        
+        Raises:
+            UnknownError: ...
+        
+        """
+
+        url = self.endpoint + PATH.AMM_BALANCE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "poolAddress": address
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            ps = PoolSnapshot(**content)
+
+            return ps
+
+    async def get_amm_pool_configurations(self) -> List[Pool]:
+        """Get all AMM Pool configurations.
+        
+        Returns:
+            List[:obj:`~loopring.amm.Pool`]: ...
+        
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.AMM_POOLS
+
+        async with self._session.get(url) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            pools = []
+
+            for p in content["pools"]:
+                pools.append(Pool(**p))
+            
+            return pools
+
     async def get_api_key(self) -> str:
         """Get the API Key associated with an account.
         
@@ -288,7 +354,7 @@ class Client:
                 raise_errors_in(content)
             
             exchange = Exchange(**content)
-            
+
             return exchange
 
     async def get_fiat_prices(self, currency: str="USD") -> List[Price]:
@@ -326,6 +392,44 @@ class Client:
                 prices.append(Price(currency=currency, **p))
             
             return prices
+
+    async def get_block(self,
+        *,
+        id_or_status: str="confirmed") -> Block:
+        """Get block info by ID or status.
+        
+        Args:
+            id_or_status (str): Any of the following; '`finalized`', '`confirmed`', \
+                '`12345`'. Defaults to '`confirmed`'.
+        
+        Returns:
+            :obj:`~loopring.exchange.Block`: ...
+        
+        Raises:
+            UnknownError: ...
+        
+        """
+
+        url = self.endpoint + PATH.BLOCK_INFO
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "id": id_or_status
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            block = Block(**content)
+
+            return block
 
     async def get_market_candlestick(self,
         market: str="LRC-ETH",
@@ -1122,9 +1226,212 @@ class Client:
             
             return trades
 
+    async def get_user_transfer_history(self,
+        *,
+        account_id: int=None,
+        end: Union[int, datetime]=None,
+        hashes: Union[str, Sequence[str]]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        status: str=None,
+        token_symbol: str=None,
+        transfer_types: str=None) -> List[TransferHashData]:
+        """Get a user's transfer history."""
+
+        url = self.endpoint + PATH.USER_TRANSFERS
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "end": validate_timestamp(end),
+            "hashes": hashes,
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "status": status,
+            "tokenSymbol": token_symbol,
+            "transferTypes": transfer_types
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transfers = []
+
+            for t in content["transactions"]:
+                transfers.append(TransferHashData(**t))
+            
+            return transfers
+
+    async def init_exchange_configuration(self) -> None:
+        """Initialise the exchange config for L1 requests."""
+        self.exchange = await self.get_exchange_configurations()
+
+        if not self.__exchange_domain_initialised:
+            EIP712.init_env(
+                chain_id=self.exchange.chain_id,
+                verifying_contract=str(self.exchange)
+            )
+
+            self.__exchange_domain_initialised = True
+
+    # TODO: Mapping for request types!
+    async def query_order_fee(self,
+        *,
+        account_id: int=None,
+        amount: str=None,
+        request_type: int=1,
+        token_symbol: str="LRC") -> Tuple[str, List[Fee]]:
+        """Return a fee amount.
+
+        Args:
+            account_id (int): ...
+            amount (str): ...
+            request_type (int): 0=Order, 1=Offchain Withdrawal, 2=Update Account, \
+                3=Transfer, 4=Fast Offchain Withdrawal, 5=Open Account, 6=AMM Exit, \
+                7=Deposit, 8=AMM Join
+            token_symbol: ...
+
+        Returns:
+            Tuple[str, List[:obj:`~loopring.token.Fee`]]: ...
+
+        Raises:
+            UnknownError: ... .
+
+        """
+
+        url = self.endpoint + PATH.USER_OFFCHAIN_FEE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "amount": amount,
+            "requestType": request_type,
+            "tokenSymbol": token_symbol
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            fees = []
+
+            for f in content["fees"]:
+                fees.append(Fee(**f))
+
+            return content["gasPrice"], fees
+
+    async def query_order_minimum_fees(self,
+        *,
+        account_id: int=None,
+        market: str="LRC-ETH") -> Tuple[str, datetime, List[RateInfo]]:
+        """Get the current trading pair (market)'s  fees.
+        
+        Args:
+            account_id (int): ...
+            market (str): ...
+        
+        Returns:
+            Tuple[str, :class:`~datetime.datetime`, List[:obj:`~loopring.token.RateInfo`]]: ...
+
+        Raises:
+            UnknownError: ...
+
+        """
+
+        url = self.endpoint + PATH.USER_ORDER_RATES
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "market": market
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            rates = []
+            
+            for a in content["amounts"]:
+                rates.append(RateInfo(**a))
+
+            cache_expiry = datetime.fromtimestamp(content["cacheOverdueAt"])
+
+            return content["gasPrice"], cache_expiry, rates
+
+    async def query_order_rates(self,
+        *,
+        account_id: int=None,
+        market: str="LRC-ETH",
+        token: Token) -> Rate:
+        """Query an order fee on a market for a given token and volume.
+
+        Args:
+            account_id (int): ... .
+            market (str): Defaults to '`LRC-ETH`'.
+            token (:obj:`~loopring.token.Token`): ... .
+
+        Returns:
+            :obj:`~loopring.token.Fee`: ...
+
+        Raises:
+            UnknownError: ... .
+
+        """
+
+        url = self.endpoint + PATH.USER_ORDER_FEE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": account_id or self.account_id,
+            "amountB": token.volume,
+            "market": market,
+            "tokenB": token.id
+        }
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            rate_content: dict = content.pop("feeRate")
+            rate_content.update(content)
+
+            rate = Rate(**rate_content)
+
+            return rate
+
     async def submit_internal_transfer(self,
         *,
-        exchange: Union[str, Exchange],
+        client_id: str=None,
+        ecdsa_key: str,
+        exchange: Union[str, Exchange]=None,
         payer_id: int,
         payer_address: str,
         payee_id: int,
@@ -1135,13 +1442,13 @@ class Client:
         valid_until: Union[int, datetime]=None,
         valid_since: Union[int, datetime]=None,
         counter_factual_info: CounterFactualInfo=None,
-        memo: str=None,
-        client_id: str=None) -> Transfer:
+        memo: str=None) -> Transfer:
         """Submit an internal transfer.
-        
+
         Args:
             client_id (str): ... .
             counter_factual_info (:obj:`~loopring.order.CounterFactualInfo`): ... .
+            ecdsa_key (str): Ethereum L1 private key.
             exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): ... .
             max_fee (:obj:`~loopring.token.Token`): ... .
             memo (str): ... .
@@ -1151,12 +1458,12 @@ class Client:
             payer_id (int): ... .
             storage_id (int): ... .
             token (:obj:`~loopring.token.Token`): ... .
-            valid_until (Union[int, :class:`~datetime.datetime`]): ... .
             valid_since (Union[int, :class:`~datetime.datetime`]): ... .
+            valid_until (Union[int, :class:`~datetime.datetime`]): ... .
 
         Returns:
             :obj:`~loopring.order.Transfer`: ... .
-        
+
         Raises:
             InvalidArguments: ... .
             InvalidExchangeID: ... .
@@ -1170,24 +1477,24 @@ class Client:
 
         if isinstance(exchange, Exchange):
             exchange = str(exchange)
-        
+
         if not valid_until:
             # Default to 2 months:
             # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
             # for information about order validity and time
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
-        valid_since = datetime.timestamp(datetime.now())
+        valid_since = int(datetime.timestamp(datetime.now()))
 
         url = self.endpoint + PATH.TRANSFER
 
-        # For some reason, ECDSASig and EDDSASig aren't
-        # required parameters in the payload...
-        # Need to look into this...
         payload = clean_params({
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
-            "exchange": exchange,
-            "maxFee": max_fee,
+            "exchange": exchange or str(self.exchange),
+            "maxFee": {
+                "tokenId": max_fee.id,
+                "volume": max_fee.volume
+            },
             "memo": memo,
             "payeeAddr": payee_address,
             "payeeId": payee_id,
@@ -1198,8 +1505,8 @@ class Client:
                 "tokenId": token.id,
                 "volume": token.volume
             },
-            "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds")
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
 
         request = Request(
@@ -1209,15 +1516,24 @@ class Client:
             payload=payload
         )
 
+        # EcDSA Signature
         message = generate_transfer_EIP712_hash(request.payload)
-        v, r, s = ecsign(message, self.private_key)
 
-        x_api_sig = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"  # EIP_712
+        ecdsa_key_bytes = int(ecdsa_key, 16).to_bytes(32, byteorder="big")
+        v, r, s = ecsign(message, ecdsa_key_bytes)
+
+        ecdsa_signature = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"  # EIP_712
 
         headers = {
             "X-API-KEY": self.api_key,
-            "X-API-SIG": x_api_sig 
+            "X-API-SIG": ecdsa_signature
         }
+
+        # EdDSA Signature
+        helper = TransferEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(request.payload)
+
+        payload["eddsaSignature"] = eddsa_signature
 
         async with self._session.post(url, headers=headers, json=payload) as r:
             raw_content = await r.read()
@@ -1229,13 +1545,108 @@ class Client:
             
             return Transfer(**content)
 
+    async def submit_offchain_withdrawal_request(self,
+        *,
+        account_id: int=None,
+        counter_factual_info: CounterFactualInfo=None,
+        ecdsa_key: str,
+        exchange: Union[str, Exchange]=None,
+        extra_data: bytes=b"",
+        fast_withdrawal_mode: bool=None,
+        hash_approved: str=None,
+        owner: str,
+        max_fee: Token,
+        min_gas: int=0,
+        storage_id: int,
+        to: str,
+        token: Token,
+        valid_since: Union[int, datetime]=None,
+        valid_until: Union[int, datetime]=None) -> PartialOrder:
+        """Submit an offchain withdrawal request."""
+
+        if not valid_until:
+            # Default to 2 months:
+            # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
+            # for information about order validity and time
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        valid_since = int(datetime.timestamp(datetime.now()))
+
+        url = self.endpoint + PATH.USER_WITHDRAWALS
+
+        onchain_data_hash = "0x" + bytes.hex(
+            generate_onchain_data_hash(
+                min_gas=min_gas, to=to, extra_data=extra_data
+            )
+        )
+
+        payload = clean_params({
+            "accountId": account_id or self.account_id,
+            "counterFactualInfo": counter_factual_info,
+            "exchange": exchange or str(self.exchange),
+            "extraData": extra_data,
+            "fastWithdrawalMode": fast_withdrawal_mode,
+            "hashApproved": hash_approved,
+            "onChainDataHash": onchain_data_hash,
+            "owner": owner,
+            "maxFee": {
+                "tokenId": max_fee.id,
+                "volume": max_fee.volume
+            },
+            "minGas": min_gas,
+            "storageId": storage_id,
+            "to": to,
+            "token": {
+                "tokenId": token.id,
+                "volume": token.volume
+            },
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
+        })
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.USER_WITHDRAWALS,
+            payload=payload
+        )
+
+        message = generate_offchain_withdrawal_EIP712_hash(request.payload)
+        ecdsa_key_bytes = int(ecdsa_key, 16).to_bytes(32, byteorder="big")
+        v, r, s = ecsign(message, ecdsa_key_bytes)
+
+        ecdsa_signature = "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "02"
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": ecdsa_signature
+        }
+
+        helper = WithdrawalEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(request.payload)
+
+        payload["ecdsaSignature"] = ecdsa_signature
+        payload["eddsaSignature"] = eddsa_signature
+        payload["extraData"] = payload.get("extraData", b"").decode()
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            withdrawal = PartialOrder(**content)
+
+            return withdrawal
+
     async def submit_order(self,
                         *,
                         affiliate: str=None,
                         all_or_none: str=False,
                         buy_token: Token,
                         client_order_id: str=None,
-                        exchange: str,
+                        exchange: Union[str, Exchange]=None,
                         fill_amount_b_or_s: bool,
                         max_fee_bips: int,
                         order_type: str=None,
@@ -1244,8 +1655,8 @@ class Client:
                         storage_id: int,
                         taker: str=None,
                         trade_channel: str=None,
-                        valid_until: Union[int, datetime]=None,
-                        valid_since: Union[int, datetime]=None
+                        valid_since: Union[int, datetime]=None,
+                        valid_until: Union[int, datetime]=None
                         ) -> PartialOrder:
         """Submit an order.
         
@@ -1258,8 +1669,8 @@ class Client:
                 to describe a token associated with a certain quantity.
             client_order_id (str): An arbitrary, unique client-side
                 order ID.
-            exchange (str): The address of the exchange used to process
-                this order.
+            exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): The address of \
+                the exchange used to process this order.
             fill_amount_b_or_s (bool): Fill the size by the `'BUY'` (True) or `'SELL'` (False) \
                 token.
             max_fee_bips (int): Maximum order fee that the user can accept, \
@@ -1276,7 +1687,7 @@ class Client:
                 specify the taker's address.
             trade_channel (str): The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
-            valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
+            valid_since (Union[int, :class:`~datetime.datetime`): The order's init \
                 time, in seconds.
             valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
                 time, in seconds.
@@ -1311,18 +1722,33 @@ class Client:
         
         """
 
+        if not (self.__exchange_domain_initialised or exchange):
+            raise InvalidArguments("Please initialise the exchange or provide one.")
+        
+        if not valid_until:
+            # Default to 2 months:
+            # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
+            # for information about order validity and time
+            valid_until = int(time.time()) + 60 * 60 * 24 * 60
+        valid_since = int(datetime.timestamp(datetime.now()))
+
         url = self.endpoint + PATH.ORDER
 
         payload = clean_params({
             "accountId": self.account_id,
             "affiliate": affiliate,
-            "allOrNone": False,  # all_or_none,
+
+            # 'allOrNone' currently doesn't accept anything
+            # other than 'False' - this will be editable
+            # once the API starts accepting other values
+            "allOrNone": False,
+
             "buyToken": {
                 "tokenId": buy_token.id,
                 "volume": buy_token.volume
             },
             "clientOrderId": client_order_id,
-            "exchange": exchange,
+            "exchange": exchange or str(self.exchange),
             "fillAmountBOrS": fill_amount_b_or_s,
             "maxFeeBips": max_fee_bips,
             "orderType": order_type,
@@ -1334,8 +1760,8 @@ class Client:
             "storageId": storage_id,
             "taker": taker,
             "tradeChannel": trade_channel,
-            "validUntil": validate_timestamp(valid_until, "seconds", True),
-            "validSince": validate_timestamp(valid_since, "seconds")
+            "validSince": validate_timestamp(valid_since, "seconds"),
+            "validUntil": validate_timestamp(valid_until, "seconds", True)
         })
 
         request = Request(

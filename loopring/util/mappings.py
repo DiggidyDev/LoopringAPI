@@ -34,9 +34,11 @@ class Mappings:
         ERR.FAILED_TO_SUBMIT_ORDER: FailedToSubmit,
 
         ERR.INCONSISTENT_TRANSFER_TOKEN_FEE_TOKEN: InconsistentTokens,
+        ERR.INSUFFICIENT_BALANCE_FOR_FEES: InsufficientBalanceForFees,
         ERR.INVALID_ACCOUNT_ID: InvalidAccountID,
         ERR.INVALID_API_KEY: InvalidAPIKey,
         ERR.INVALID_ARGUMENTS: InvalidArguments,
+        ERR.INVALID_BLOCK: InvalidBlock,
         ERR.INVALID_EXCHANGE_ID: InvalidExchangeID,
         ERR.INVALID_NONCE: InvalidNonce,
         ERR.INVALID_ORDER: InvalidOrder,
@@ -48,6 +50,7 @@ class Mappings:
         ERR.INVALID_TRANSFER_SENDER: InvalidTransferSender,
         ERR.INVALID_USER_BALANCE: InvalidUserBalance,
 
+        ERR.MINIMUM_FEES_NOT_EXCEEDED: MinimumFeesNotExceeded,
         ERR.NO_ORDER_TO_CANCEL: NoOrderToCancel,
         ERR.NON_EXISTENT_ORDER: OrderNotFound,
         ERR.ORDER_ALREADY_EXISTS: OrderAlreadyExists,

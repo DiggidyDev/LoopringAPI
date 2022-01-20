@@ -66,6 +66,7 @@ class ErrorCodes(IntEnum):
     # Orders, Transaction histories
     EMPTY_USER = 107001
     EMPTY_ORDERHASH = 107002
+    INVALID_BLOCK = 103011  # Undocumented error code
     NON_EXISTENT_ORDER = 107003
 
     # Orders, Market, AMM Pools
@@ -108,7 +109,10 @@ class Paths(str, Enum):
     """All paths available on the API."""
 
     ACCOUNT = "/api/v3/account"
+    AMM_BALANCE = "/api/v3/amm/balance"
+    AMM_POOLS = "/api/v3/amm/pools"
     API_KEY = "/api/v3/apiKey"
+    BLOCK_INFO = "/api/v3/block/getBlock"
     CANDLESTICK = "/api/v3/candlestick"
     DEPTH = "/api/v3/depth"
     EXCHANGES = "/api/v3/exchange/info"
@@ -125,8 +129,12 @@ class Paths(str, Enum):
     TRANSFER = "/api/v3/transfer"
     USER_BALANCES = "/api/v3/user/balances"
     USER_DEPOSITS = "/api/v3/user/deposits"
+    USER_OFFCHAIN_FEE = "/api/v3/user/offchainFee"
+    USER_ORDER_FEE = "/api/v3/user/orderFee"
+    USER_ORDER_RATES = "/api/v3/user/orderUserRateAmount"
     USER_PASSWORD_RESETS = "/api/v3/user/updateInfo"
     USER_REGISTRATION = "/api/v3/user/createInfo"
+    USER_TRANSFERS = "/api/v3/user/transfers"
     USER_WITHDRAWALS = "/api/v3/user/withdrawals"
 
 
