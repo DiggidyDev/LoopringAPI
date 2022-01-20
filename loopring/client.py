@@ -14,7 +14,7 @@ from .errors import *
 from .exchange import DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
-from .token import Price, Token, TokenConfig
+from .token import Fee, Price, Token, TokenConfig
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
@@ -1179,6 +1179,53 @@ class Client:
             )
 
             self.__exchange_domain_initialised = True
+
+    async def query_order_fee(self,
+        *,
+        account_id: int=None,
+        market: str="LRC-ETH",
+        token: Token) -> Fee:
+        """Query an order fee on a market for a given token and volume.
+
+        Args:
+            account_id (int): ... .
+            market (str): Defaults to '`LRC-ETH`'.
+            token (:obj:`~loopring.token.Token`): ... .
+
+        Returns:
+            :obj:`~loopring.token.Fee`: ...
+
+        Raises:
+            UnknownError: ... .
+
+        """
+
+        url = self.endpoint + PATH.USER_ORDER_FEE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = {
+            "accountId": account_id or self.account_id,
+            "amountB": token.volume,
+            "market": market,
+            "tokenB": token.id
+        }
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            fee_content: dict = content.pop("feeRate")
+            fee_content.update(content)
+
+            fee = Fee(**fee_content)
+
+            return fee
 
     async def submit_internal_transfer(self,
         *,
