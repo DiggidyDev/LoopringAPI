@@ -10,7 +10,7 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
-from .amm import AMMTransaction, ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
+from .amm import AMMTrade, AMMTransaction, ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -360,6 +360,35 @@ class Client:
             
             return pools
 
+    async def get_amm_trade_history(self,
+        amm_pool: Union[str, Pool, PoolSnapshot],
+        limit: int=None,
+        offset: int=None) -> List[AMMTrade]:
+        """Get a pool's AMM trade history."""
+
+        url = self.endpoint + PATH.AMM_TRADES
+
+        params = clean_params({
+            "ammPoolAddress": str(amm_pool),
+            "limit": limit,
+            "offset": offset
+        })
+
+        async with self._session.get(url, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            trades = []
+
+            for t in content["trades"]:
+                trades.append(AMMTrade(**t))
+            
+            return trades
+
     async def get_api_key(self) -> str:
         """Get the API Key associated with an account.
         
@@ -408,6 +437,44 @@ class Client:
                 raise_errors_in(content)
 
             return content["apiKey"]
+
+    async def get_block(self,
+        *,
+        id_or_status: str="confirmed") -> Block:
+        """Get block info by ID or status.
+        
+        Args:
+            id_or_status (str): Any of the following; '`finalized`', '`confirmed`', \
+                '`12345`'. Defaults to '`confirmed`'.
+        
+        Returns:
+            :obj:`~loopring.exchange.Block`: ...
+        
+        Raises:
+            UnknownError: ...
+        
+        """
+
+        url = self.endpoint + PATH.BLOCK_INFO
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "id": id_or_status
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            block = Block(**content)
+
+            return block
 
     async def get_exchange_configurations(self) -> Exchange:
         """Get configurations of loopring's exchange.
@@ -469,44 +536,6 @@ class Client:
                 prices.append(Price(currency=currency, **p))
             
             return prices
-
-    async def get_block(self,
-        *,
-        id_or_status: str="confirmed") -> Block:
-        """Get block info by ID or status.
-        
-        Args:
-            id_or_status (str): Any of the following; '`finalized`', '`confirmed`', \
-                '`12345`'. Defaults to '`confirmed`'.
-        
-        Returns:
-            :obj:`~loopring.exchange.Block`: ...
-        
-        Raises:
-            UnknownError: ...
-        
-        """
-
-        url = self.endpoint + PATH.BLOCK_INFO
-
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = clean_params({
-            "id": id_or_status
-        })
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-            
-            block = Block(**content)
-
-            return block
 
     async def get_market_candlestick(self,
         market: str="LRC-ETH",
@@ -1079,7 +1108,7 @@ class Client:
         start: Union[int, datetime]=None,
         tx_status: str=None,
         tx_types: str=None) -> List[AMMTransaction]:
-        """Get a user's AMM transaction history."""
+        """Get a user's AMM join/exit history."""
 
         url = self.endpoint + PATH.AMM_USER_TRANSACTIONS
 
