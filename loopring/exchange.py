@@ -48,7 +48,7 @@ class _Token:
         return auto_repr(self)
 
 
-class _TxModel:
+class TxModel:
 
     account_id: int
     fee: _Token
@@ -97,7 +97,7 @@ class Block:
     created_at: datetime
     exchange: str
     status: str
-    transactions: List[_TxModel]
+    transactions: List[TxModel]
     tx_hash: str
 
     def __init__(self, **data):
@@ -106,7 +106,7 @@ class Block:
                 transactions = []
 
                 for t in data[k]:
-                    transactions.append(_TxModel(**t))
+                    transactions.append(TxModel(**t))
                 
                 setattr(self, to_snake_case(k), transactions)
             
