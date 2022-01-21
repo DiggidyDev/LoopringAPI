@@ -188,6 +188,28 @@ class TransferEDDSASign(EDDSASign):
         ]
 
 
+class UpdateAccountEDDSASign(EDDSASign):
+    def __init__(self, private_key):
+        super().__init__(
+            poseidon_params(
+                IntSig.SNARK_SCALAR_FIELD, 9, 6, 53, b"poseidon", 5, security=128
+            ),
+            private_key=private_key
+        )
+    
+    def serialise(self, updateAccount):
+        return [
+            int(updateAccount["exchange"], 16),
+            int(updateAccount["accountId"]),
+            int(updateAccount["maxFee"]["tokenId"]),
+            int(updateAccount["maxFee"]["volume"]),
+            int(updateAccount["publicKey"]["x"], 16),
+            int(updateAccount["publicKey"]["y"], 16),
+            int(updateAccount["validUntil"]),
+            int(updateAccount["nonce"])
+        ]
+
+
 class WithdrawalEDDSASign(EDDSASign):
     def __init__(self, private_key):
         super().__init__(
