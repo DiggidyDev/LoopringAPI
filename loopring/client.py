@@ -1368,9 +1368,6 @@ class Client:
         helper = MessageEDDSASign(private_key=self.private_key)
         payload["eddsaSignature"] = helper.sign(message)
 
-        print(payload)
-        exit()
-
         async with self._session.post(url, headers=headers, payload=payload) as r:
             raw_content = await r.read()
 
