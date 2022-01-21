@@ -10,7 +10,7 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
-from .amm import ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
+from .amm import AMMTransaction, ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -1069,6 +1069,49 @@ class Client:
             
             return token_confs
 
+    async def get_user_amm_join_exit_history(self,
+        *,
+        account_id: int=None,
+        amm_pool: Union[str,  Pool, PoolSnapshot],
+        end: Union[int, datetime]=None,
+        limit: int=None,
+        offset: int=None,
+        start: Union[int, datetime]=None,
+        tx_status: str=None,
+        tx_types: str=None) -> List[AMMTransaction]:
+        """Get a user's AMM transaction history."""
+
+        url = self.endpoint + PATH.AMM_USER_TRANSACTIONS
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "accountId": account_id or self.account_id,
+            "ammPoolAddress": str(amm_pool),
+            "end": validate_timestamp(end),
+            "limit": limit,
+            "offset": offset,
+            "start": validate_timestamp(start),
+            "txStatus": tx_status,
+            "txTypes": tx_types
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transactions = []
+
+            for t in content["transactions"]:
+                transactions.append(AMMTransaction(**t))
+
+            return transactions
+
     async def get_user_deposit_history(self,
         *,
         account_id: int=None,
@@ -1788,7 +1831,7 @@ class Client:
 
     async def submit_order(self,
                         *,
-                        affiliate: int=66825,
+                        affiliate: str="66825",
                         all_or_none: str=False,
                         buy_token: Token,
                         client_order_id: str=None,
@@ -1807,7 +1850,8 @@ class Client:
         
         Args:
             affiliate (str): An account ID to receive a share of the
-                order's fee.
+                order's fee. Don't supply this argument if you want to support
+                the project directly!
             all_or_none (str): Whether the order supports partial fills
                 or not. Currently only supports `False`, no need to provide this arg.
             buy_token (:obj:`~loopring.token.Token`): Wrapper object used \
@@ -1890,20 +1934,14 @@ class Client:
             # once the API starts accepting other values
             "allOrNone": False,
 
-            "buyToken": {
-                "tokenId": buy_token.id,
-                "volume": buy_token.volume
-            },
+            "buyToken": buy_token.to_params(),
             "clientOrderId": client_order_id,
             "exchange": exchange or str(self.exchange),
             "fillAmountBOrS": fill_amount_b_or_s,
             "maxFeeBips": max_fee_bips,
             "orderType": order_type,
             "poolAddress": pool_address,
-            "sellToken": {
-                "tokenId": sell_token.id,
-                "volume": sell_token.volume
-            },
+            "sellToken": sell_token.to_params(),
             "storageId": order_id,
             "taker": taker,
             "tradeChannel": trade_channel,

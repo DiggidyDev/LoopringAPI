@@ -7,7 +7,7 @@ Whether this is in the form of a spelling mistake, a redesign of a class, or a n
 
 I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of the wrapper first.
 
-# PROGRESS: 34/38 REST API Endpoints done!
+# PROGRESS: 35/38 REST API Endpoints done!
 
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
 - I have yet to start on the websocket API!
@@ -32,6 +32,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [ ] Add loads of examples!
 - [ ] Ratelimits exist, but information is scarce... Work on implementing async ratelimiting anyway!
 - [ ] Synchronous version of the wrapper?
+- [ ] Periodic token config updating, necessary for long-running clients.
 
 ## Honourable mentions:
 
@@ -39,3 +40,7 @@ A big, big thank you to the following people:
 
 - BanthaFupa: Helping to test the different endpoints!
 - Taranasus: His [LoopringSharp](https://github.com/taranasus/LoopringSharp) package gave me the little boost of motivation to get started on this API wrapper!
+
+# Like what you see?
+
+If you like what you see and want to support the development of this wrapper, it's as simple as just using it! Whenever you [place an order](https://diggydev.co.uk/loopring/apireference.html#loopring.client.Client.submit_order) (without changing the `affiliate` arg), it'll send a small share of the fees to me! <3
