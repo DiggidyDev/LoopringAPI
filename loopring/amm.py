@@ -1,7 +1,58 @@
+from datetime import datetime
 from typing import List, Union
 
 from .token import Token
 from .util.helpers import auto_repr, to_snake_case
+
+
+class AMMToken:
+    """An AMMToken model."""
+
+    actual_amount: str
+    amount: str
+    fee_amount: str
+    token_id: int
+
+    def __init__(self, **data):
+        for k in data.keys():
+            setattr(self, to_snake_case(k), data[k])
+        
+    def __repr__(self) -> str:
+        return auto_repr(self)
+
+
+class AMMTransaction:
+    """An AMMTransaction model."""
+
+    amm_layer_type: str
+    amm_pool_address: str
+    block_id: int
+    created_at: datetime
+    hash: str
+    index_in_block: int
+    lp_tokens: List[AMMToken]
+    pool_tokens: List[AMMToken]
+    tx_status: str
+    tx_type: str
+    updated_at: datetime
+
+    def __init__(self, **data):
+        for k in data.keys():
+            if "At" in k:
+                dt = datetime.fromtimestamp(int(data[k] / 1000))
+                setattr(self, to_snake_case(k), dt)
+            elif "Tokens" in k:
+                tokens = []
+
+                for t in data[k]:
+                    tokens.append(AMMToken(**t))
+
+                setattr(self, to_snake_case(k), tokens)
+            else:
+                setattr(self, to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
 
 
 class PoolPrecisions:
@@ -103,6 +154,9 @@ class Pool:
     
     def __repr__(self) -> str:
         return auto_repr(self)
+    
+    def __str__(self) -> str:
+        return self.address
 
 
 class PoolSnapshot:
@@ -132,4 +186,7 @@ class PoolSnapshot:
     
     def __repr__(self) -> str:
         return auto_repr(self)
+    
+    def __str__(self) -> str:
+        return self.pool_address
 
