@@ -67,8 +67,9 @@ class Client:
     endpoint: ENDPOINT
     exchange: Exchange
     handle_errors: bool
-    offchain_ids: list = [0] * 2 ** 16
-    order_ids: list    = [0] * 2 ** 16
+    offchain_ids: list        = [0] * 2 ** 16
+    order_ids: list           = [0] * 2 ** 16
+    tokens: List[TokenConfig] = []
 
     def __init__(self,
             account_id: int=None,
@@ -1092,7 +1093,6 @@ class Client:
 
             return dt
 
-    # TODO: Local storage
     async def get_token_configurations(self) -> List[TokenConfig]:
         """Return the configs of all supporoted tokens (Ether included).
         
@@ -1119,6 +1119,8 @@ class Client:
             for t in content:
                 token_config = TokenConfig(**t)
                 token_confs.append(token_config)
+            
+            self.tokens = token_confs
             
             return token_confs
 
