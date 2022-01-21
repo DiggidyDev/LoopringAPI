@@ -22,12 +22,13 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Load in client config/account export from a file instead of pasting it directly into a python script.
 - [x] Make some sense out of [how storage IDs work](https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#storage).
 - [x] Finish off REST API endpoints.
+- [ ] Finish documentation for all the endpoints.
+- [ ] Make some util functions for accessing local storage objects.
 - [ ] Look into turning prices into floats instead of strings.
 - [ ] Make a helper for volume conversion.
 - [ ] Make a `CONTRIBUTING.md`
 - [ ] Add a mapping for request types (query_order_fee())
 - [ ] Start and finish the websocket API.
-- [ ] Finish documentation for all the endpoints.
 - [ ] Figure out why `keySeed` isn't being returned from the account query endpoint.
 - [ ] Add loads of examples!
 - [ ] Ratelimits exist, but information is scarce... Work on implementing async ratelimiting anyway!
@@ -41,6 +42,6 @@ A big, big thank you to the following people:
 - BanthaFupa: Helping to test the different endpoints!
 - Taranasus: His [LoopringSharp](https://github.com/taranasus/LoopringSharp) package gave me the little boost of motivation to get started on this API wrapper!
 
-# Like what you see?
+## Like what you see?
 
 If you like what you see and want to support the development of this wrapper, it's as simple as just using it! Whenever you [place an order](https://diggydev.co.uk/loopring/apireference.html#loopring.client.Client.submit_order) (without changing the `affiliate` arg), it'll send a small share of the fees to me! <3
