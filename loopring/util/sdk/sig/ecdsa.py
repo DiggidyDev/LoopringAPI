@@ -36,6 +36,42 @@ class EIP712:
         return Web3.keccak(b"".join([cls.EIP191_HEADER, domain_hash, data_hash]))
 
 
+def generate_amm_pool_exit_EIP712_hash(payload: dict):
+    """
+        struct PoolExit
+        {
+            address   owner;
+            uint96    burnAmount;
+            uint32    burnStorageID; // for pool token withdrawal from user to the pool
+            uint96[]  exitMinAmounts;
+            uint96    fee;
+            uint32    validUntil;
+        }
+    """
+
+    class PoolExit(EIP712Struct):
+        owner           = Address()
+        burnAmount      = Uint(96)
+        burnStorageID   = Uint(32)
+        exitMinAmounts  = Array(Uint(96))
+        fee             = Uint(96)
+        validUntil      = Uint(32)
+
+    _exit = PoolExit(
+        owner           = payload["owner"],
+        burnAmount      = int(payload["exitTokens"]["burned"]["volume"]),
+        burnStorageID   = int(payload["storageId"]),
+        exitMinAmounts  = [int(token["volume"]) for token in payload["exitTokens"]["unPooled"]],
+        fee             = int(payload["maxFee"]),
+        validUntil      = payload["validUntil"]
+    )
+
+    return EIP712.hash_packed(
+        EIP712.amm_pool_domains[payload["poolAddress"]].hash_struct(),
+        _exit.hash_struct()
+    )
+
+
 def generate_amm_pool_join_EIP712_hash(payload: dict):
     """
         struct PoolJoin

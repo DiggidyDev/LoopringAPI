@@ -110,8 +110,10 @@ class Paths(str, Enum):
 
     ACCOUNT = "/api/v3/account"
     AMM_BALANCE = "/api/v3/amm/balance"
+    AMM_EXIT = "/api/v3/amm/exit"
     AMM_JOIN = "/api/v3/amm/join"
     AMM_POOLS = "/api/v3/amm/pools"
+    AMM_USER_TRANSACTIONS = "/api/v3/amm/user/transactions"
     API_KEY = "/api/v3/apiKey"
     BLOCK_INFO = "/api/v3/block/getBlock"
     CANDLESTICK = "/api/v3/candlestick"
