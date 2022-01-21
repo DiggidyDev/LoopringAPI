@@ -2,6 +2,8 @@ import eip712_structs
 from eip712_structs import Address, Array, Bytes, EIP712Struct, Uint
 from web3 import Web3
 
+from ..ethsnarks.jubjub import FQ, Point
+
 
 class EIP712:
 
@@ -212,3 +214,33 @@ def generate_onchain_data_hash(*,
             extra_data
         ]
     ))[:20]
+
+
+def generate_update_account_EIP712_hash(payload: dict):
+
+    class AccountUpdate(EIP712Struct):
+        owner = Address()
+        accountID = Uint(32)
+        feeTokenID = Uint(16)
+        maxFee = Uint(96)
+        publicKey = Uint(256)
+        validUntil = Uint(32)
+        nonce = Uint(32)
+
+    pt = Point(FQ(int(payload["publicKey"]["x"], 16)), FQ(int(payload["publicKey"]["y"], 16)))
+    public_key = int.from_bytes(pt.compress(), "little")
+
+    update = AccountUpdate(
+        owner       = payload["owner"],
+        accountID   = payload["accountId"],
+        feeTokenID  = payload["maxFee"]["tokenId"],
+        maxFee      = int(payload["maxFee"]["volume"]),
+        publicKey   = public_key,
+        validUntil  = payload["validUntil"],
+        nonce       = payload["nonce"]
+    )
+
+    return EIP712.hash_packed(
+        EIP712.exchange_domain.hash_struct(),
+        update.hash_struct()
+    )
