@@ -7,7 +7,7 @@ Whether this is in the form of a spelling mistake, a redesign of a class, or a n
 
 I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of the wrapper first.
 
-# PROGRESS: 37/38 REST API Endpoints done!
+# PROGRESS: 38/38 REST API Endpoints done!
 
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
 - I have yet to start on the websocket API!
@@ -21,7 +21,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Initialisation method for client to load in all token and storage info locally for fast access. This would improve QoL for directly passing objects into queries rather than splitting up mismatched attributes (Token obj vs. Token symbol, token volume)
 - [x] Load in client config/account export from a file instead of pasting it directly into a python script.
 - [x] Make some sense out of [how storage IDs work](https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#storage).
-- [ ] Finish off REST API endpoints.
+- [x] Finish off REST API endpoints.
 - [ ] Look into turning prices into floats instead of strings.
 - [ ] Make a helper for volume conversion.
 - [ ] Make a `CONTRIBUTING.md`

@@ -21,8 +21,8 @@ from .util.enums import IntSig
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import EIP712, generate_amm_pool_exit_EIP712_hash, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash
-from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
+from .util.sdk.sig.ecdsa import EIP712, generate_amm_pool_exit_EIP712_hash, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash, generate_update_account_EIP712_hash
+from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSASign, UpdateAccountEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
@@ -2084,3 +2084,62 @@ class Client:
 
             return self.api_key
 
+    async def update_account_eddsa_key(self,
+        *,
+        account_id: int=None,
+        ecdsa_key: str,
+        exchange: Union[str, Exchange]=None,
+        max_fee: Token,
+        owner: str=None,
+        valid_until: Union[int, datetime]=None) -> ...:
+        """Update the EdDSA key associated with an account."""
+
+        url = self.endpoint + PATH.ACCOUNT
+
+        if not valid_until:
+            ts = int(time.time()) + 60 * 60 * 24 * 60
+            valid_until = datetime.fromtimestamp(ts)
+
+        payload = {
+            "accountId": account_id or self.account_id,
+            "exchange": exchange or str(self.exchange),
+            "maxFee": max_fee.to_params(),
+            "nonce": self.nonce,
+            "owner": owner or self.address,
+            "publicKey": {
+                "x": self.publicX,
+                "y": self.publicY
+            },
+            "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
+        }
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.ACCOUNT,
+            payload=payload
+        )
+
+        message = generate_update_account_EIP712_hash(request.payload)
+
+        ecdsa_key = int(ecdsa_key, 16).to_bytes(32, byteorder="big")
+
+        v, r, s = ecsign(message, ecdsa_key)
+        headers = {
+            "X-API-SIG": "0x" + bytes.hex(v_r_s_to_signature(v, r, s)) + "03"
+        }
+
+        helper = UpdateAccountEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(payload)
+
+        payload["eddsaSignature"] = eddsa_signature
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            return content
