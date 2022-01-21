@@ -1,8 +1,33 @@
 from datetime import datetime
+from re import S
 from typing import List, Union
 
 from .token import Token
 from .util.helpers import auto_repr, to_snake_case
+
+
+class AMMTrade:
+    """An AMMTrade model."""
+
+    account_id: int
+    created_at: datetime
+    fee_amount: str
+    market: str
+    order_hash: str
+    price: str  # float
+    side: str
+    size: str
+
+    def __init__(self, **data):
+        for k in data.keys():
+            if "At" in k:
+                dt = datetime.fromtimestamp(data[k] // 1000)
+                setattr(self, to_snake_case(k), dt)
+            else:
+                setattr(self,  to_snake_case(k), data[k])
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
 
 
 class AMMToken:
@@ -39,7 +64,7 @@ class AMMTransaction:
     def __init__(self, **data):
         for k in data.keys():
             if "At" in k:
-                dt = datetime.fromtimestamp(int(data[k] / 1000))
+                dt = datetime.fromtimestamp(data[k] // 1000)
                 setattr(self, to_snake_case(k), dt)
             elif "Tokens" in k:
                 tokens = []
