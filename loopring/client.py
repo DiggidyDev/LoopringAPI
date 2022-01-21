@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Sequence, Tuple, Union
 
 import aiohttp
+import requests
 from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
@@ -2030,4 +2031,234 @@ class Client:
             self.api_key = new_api_key
 
             return self.api_key
+
+
+
+
+
+#========================================================================================================================
+#=========================================={Enhanced Order Functionality & Testing}======================================
+#========================================================================================================================
+
+    # update parameters to take only the client - 1. replace get_balance function with client-based solution
+    async def market_order(self,
+                         *,
+                         asset1: float = None,
+                         asset2: str = None,
+                         trade_pair: str = None,
+                         funding: float = None,
+                         size:  int = None
+                         ) -> str:
+
+        """Market Order - allow user to execute market order at strike price, that exhibits bi-directional market orders
+                            by switching the order of assets.
+            Args:
+                asset1 (str): asset to buy
+                asset2 (str): asset to sell
+                trade_pair (str): trade pair
+                funding (float): amount of asset 2 to sell (units: asset2)
+                size (float): amount of asset 1 to buy (units: asset1)
+
+            Returns:
+                str: transaction hash of specified order.
+
+            Raises:
+                EmptyAPIKey: ...
+                EmptySignature: ...
+
+
+             ############################
+            #### UNDER CONSTRUCTION ####
+           ############################
+        """
+
+        # Does Exchange represent the address of the exchange for the client?
+        EXC = Exchange
+
+        # get token ids
+        tid1 = int(get_token_id(asset1))
+        tid2 = int(get_token_id(asset2))
+        trade_pair = asset1 + "-" + asset2
+
+
+        # get relayer timestamp and calculate some future time... (the added 60x60x1000 'seconds?' is virtual duct tape)
+        time_now = get_relayer_time()
+        time_now = datetime.datetime.utcfromtimestamp(time_now / 1000)
+        print(time_now)
+        in5min = time_now + datetime.timedelta(days=100)
+        print(in5min)
+        print(datetime.datetime.timestamp(in5min))
+        in5min = int(datetime.datetime.timestamp(in5min))
+        time_now = int(datetime.datetime.timestamp(time_now))
+
+        # get print lowest ask (for debug)
+        bp = get_asks(trade_pair)
+        bp = float(bp[0][0])
+        sp = get_asks(trade_pair)
+        sp = float(sp[0][0])
+        print("sp,bp = " + str(sp) + ", " + str(bp))
+
+        # get volumes based on 'funding' (print for debug)
+        va1 = int(funding/float(bp)    * 10 ** 18)
+        va2 = int(funding       * 10 ** 18)
+        # print("~ Volumes (1), (2), (2/1) ~")
+        print("Trading " + str(va1) + " " + str(asset1)+ " for " + str(va2) + " " + str(asset2) + " (i.e. price = " + str(va2/va1) + ")")
+        # print(va2)
+        # print(va2 / va1)
+        # print()
+        # Define Tokens
+        buyTok = self.token.Token(id=tid1, volume=va1)
+        sellTok = self.token.Token(id=tid2, volume=va2)
+
+        # Execute trades
+        sid = await self.get_next_storage_id(sell_token_id=get_token_id(asset1),)
+        print(sid)
+        msg = await self.submit_order(buy_token=buyTok, sell_token=sellTok, exchange=EXC, fill_amount_b_or_s=False,
+                                               max_fee_bips=50, order_type="TAKER_ONLY", storage_id=str(sid['orderId']+2),
+                                               trade_channel="MIXED",valid_since=time_now,valid_until=in5min, all_or_none=False)
+        return msg
+
+
+# Future work:
+    async def limit_order(self) -> str:
+        return -1
+
+#========================================================================================================================
+#=================================={Public Client Data & Utilities}======================================================
+#========================================================================================================================
+
+# The public client consists of a set of global functions that facilitate interaction with the loopring ecosystem.
+# most functions are built for data retrieval, some for data conversion.
+
+def get_depth(trade_pair, level=2, limit=50):
+    """ get depth - gets the market depth at the current time
+        Args:
+            trade_pair (str): the trade pair or market you wish to check
+            level: ...
+            limit: ...
+
+        Returns:
+            json object representing current market depth
+    """
+    API_URL = "https://api3.loopring.io/api/v3/depth?market=" + trade_pair + "&level=" + str(level) + "&limit=" + str(limit)
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh,en;q=0.9",
+    }
+    response = requests.get(API_URL, data)
+    depth = response.json()
+    return depth
+
+
+# ----------------------------------------------------
+
+def get_bids(trade_pair, level=1):
+    API_URL = "https://api3.loopring.io/api/v3/depth?market=" + trade_pair + "&level=" + str(level) + "&limit=50"
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh,en;q=0.9",
+    }
+    response = requests.get(API_URL, data)
+    depth = response.json()
+    bids = depth['bids']
+    return bids
+
+
+# ----------------------------------------------------
+
+def get_asks(trade_pair, level=1):
+    API_URL = "https://api3.loopring.io/api/v3/depth?market=" + trade_pair + "&level=" + str(level) + "&limit=50"
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "zh,en;q=0.9",
+    }
+    response = requests.get(API_URL, data)
+    depth = response.json()
+    asks = depth['asks']
+    return asks
+
+
+# ==================================================================
+
+def get_ticker(trade_pair):
+    API_URL = "https://api3.loopring.io/api/v3/ticker?market=" + trade_pair + ""
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept - Language": "zh, enq = 0.9",
+    }
+    response = requests.get(API_URL, data)
+    tickers = response.json()
+    ticker = tickers['tickers'][0]
+    return ticker
+
+# ==================================================================
+
+def get_relayer_time():
+    API_URL = "https://api3.loopring.io/api/v3/timestamp"
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept - Language": "zh, enq = 0.9",
+    }
+    response = requests.get(API_URL, data)
+    timestamp = response.json()
+    return timestamp['timestamp']
+
+
+# ==================================================================
+
+def get_trade_pairs():
+    # get trade pairs on loopring exchange
+    API_URL = "https://api3.loopring.io/api/v3/exchange/markets"
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept - Language": "zh, enq = 0.9",
+    }
+    response = requests.get(API_URL, data)
+    mkts = response.json()
+    mkt_list = mkts['markets']
+    pairs = [''] * len(mkt_list)
+    for i in range(0, len(mkt_list)):
+        pairs[i] = mkt_list[i]['market']
+    return pairs
+
+
+# ==================================================================
+
+def get_token_id(asset):
+    # get trade pairs on loopring exchange
+    API_URL = "https://api3.loopring.io/api/v3/exchange/tokens"
+    data = {
+        "Host": "api3.loopring.io",
+        "Connection": "keep-alive",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept - Language": "zh, enq = 0.9",
+    }
+    response = requests.get(API_URL, data)
+    tkns = response.json()
+    tokenid = -1
+    # tkn_list = tkns['tokens']
+    for i in range(0, len(tkns)):
+        if tkns[i]['symbol'] == asset:
+            tokenid = tkns[i]['tokenId']
+
+    return tokenid
 
