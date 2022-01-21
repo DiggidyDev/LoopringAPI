@@ -10,7 +10,7 @@ from py_eth_sig_utils.signing import v_r_s_to_signature
 from py_eth_sig_utils.utils import ecsign
 
 from .account import Account, Balance
-from .amm import Pool, PoolSnapshot, PoolTokens
+from .amm import ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
 from .errors import *
 from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
@@ -21,16 +21,17 @@ from .util.enums import IntSig
 from .util.enums import Paths as PATH
 from .util.helpers import clean_params, raise_errors_in, ratelimit, validate_timestamp
 from .util.request import Request
-from .util.sdk.sig.ecdsa import EIP712, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash
+from .util.sdk.sig.ecdsa import EIP712, generate_amm_pool_exit_EIP712_hash, generate_offchain_withdrawal_EIP712_hash, generate_onchain_data_hash, generate_transfer_EIP712_hash, generate_amm_pool_join_EIP712_hash
 from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSASign, UrlEDDSASign, WithdrawalEDDSASign
 
 # TODO: Do something about exception classes... it's getting a bit messy.
 #       Also, rewrite some of the descriptions.
-#       Idea: group some of the error codes under other errors? e.g.
+#       Idea: subclass some of the errors? e.g.
 #       `OrderNotFound` could also be used when there isn't an order to cancel...
 
-
 # TODO: UpdateAccountEDDSAKey endpoint (need keySeed? from account query)
+
+# TODO: Maybe accept `Fee` as the type for `max_fee` args, instead of `Token`
 
 
 
@@ -201,6 +202,57 @@ class Client:
 
         if not self._session.closed:
             await self._session.close()
+
+    async def exit_amm_pool(self,
+        *,
+        exit_tokens: ExitPoolTokens,
+        max_fee: int,
+        owner: str=None,
+        pool: Union[str, Pool],
+        valid_until: Union[int, datetime]=None) -> Transfer:
+        """Exit an AMM pool."""
+
+        url = self.endpoint + PATH.AMM_EXIT
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        # No need for `clean_params()` because all keys here are required
+        payload = {
+            "exitTokens": exit_tokens.to_params(),
+            "maxFee": max_fee,
+            "owner": owner or self.address,
+            "poolAddress": pool if isinstance(pool, str) else pool.address,
+            "storageId": self.offchain_ids[exit_tokens.burned.id],
+            "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
+        }
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.AMM_EXIT,
+            payload=payload
+        )
+
+        message = generate_amm_pool_exit_EIP712_hash(request.payload)
+        
+        helper = MessageEDDSASign(private_key=self.private_key)
+        eddsa_signature = helper.sign(message)
+
+        payload["eddsaSignature"] = eddsa_signature
+
+        self.offchain_ids[exit_tokens.burned.id] += 2
+
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transfer = Transfer(**content)
+            return transfer
 
     async def get_account_info(self, address: str) -> Account:
         """Returns data associated with the user's exchange account.
@@ -987,6 +1039,7 @@ class Client:
 
             return dt
 
+    # TODO: Local storage
     async def get_token_configurations(self) -> List[TokenConfig]:
         """Return the configs of all supporoted tokens (Ether included).
         
@@ -1317,7 +1370,7 @@ class Client:
     async def join_amm_pool(self,
         *,
         fee: Union[int, Fee],
-        join_tokens: PoolTokens,
+        join_tokens: JoinPoolTokens,
         owner: str=None,
         pool: Union[str, Pool],
         storage_ids: List[int]=None,
@@ -1368,7 +1421,7 @@ class Client:
         helper = MessageEDDSASign(private_key=self.private_key)
         payload["eddsaSignature"] = helper.sign(message)
 
-        async with self._session.post(url, headers=headers, payload=payload) as r:
+        async with self._session.post(url, headers=headers, json=payload) as r:
             raw_content = await r.read()
 
             content: dict = json.loads(raw_content.decode())
