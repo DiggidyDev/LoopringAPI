@@ -117,6 +117,7 @@ class Paths(str, Enum):
     AMM_USER_TRANSACTIONS = "/api/v3/amm/user/transactions"
     API_KEY = "/api/v3/apiKey"
     BLOCK_INFO = "/api/v3/block/getBlock"
+    BLOCK_PENDING_TXS = "/api/v3/block/getPendingRequests"
     CANDLESTICK = "/api/v3/candlestick"
     DEPTH = "/api/v3/depth"
     EXCHANGES = "/api/v3/exchange/info"

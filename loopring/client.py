@@ -12,7 +12,7 @@ from py_eth_sig_utils.utils import ecsign
 from .account import Account, Balance
 from .amm import AMMTrade, AMMTransaction, ExitPoolTokens, JoinPoolTokens, Pool, PoolSnapshot
 from .errors import *
-from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, WithdrawalHashData
+from .exchange import Block, DepositHashData, Exchange, TransactionHashData, TransferHashData, TxModel, WithdrawalHashData
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Fee, Price, Rate, RateInfo, Token, TokenConfig
@@ -998,6 +998,30 @@ class Client:
                 tx_list.append(TransactionHashData(**t))
             
             return tx_list
+
+    async def get_pending_block_transactions(self) -> List[TxModel]:
+        """Get pending txs to be packed into the next block."""
+
+        url = self.endpoint + PATH.BLOCK_PENDING_TXS
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+
+        async with self._session.get(url, headers=headers) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            transactions = []
+
+            for tx in content:
+                transactions.append(TxModel(**tx))
+
+            return transactions
 
     async def get_recent_market_trades(self,
         market: str="LRC-ETH",
