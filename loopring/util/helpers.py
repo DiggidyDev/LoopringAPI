@@ -1,11 +1,10 @@
 import time
 from datetime import datetime
-from typing import Callable, Union
+from typing import Callable, Iterable, Union
 
 from aiolimiter import AsyncLimiter
 
 from ..errors import ValidationException
-
 from ..util.mappings import Mappings
 
 
@@ -46,6 +45,24 @@ def clean_params(params: dict) -> dict:
     """
 
     return {k: v for k, v in params.items() if v is not None}
+
+
+def fetch(seq: Iterable, **attrs) -> object:
+    """A helper for fetching an object from an iterable.
+    
+    Only the first instance will be returned where all ``attrs`` match.
+
+    Args:
+        seq: A sequence of objects to search through.
+
+    """
+
+    if isinstance(seq, dict):
+        seq = seq.values()
+    
+    for obj in seq:
+        if all(getattr(obj, attr) == attrs[attr] for attr in attrs):
+            return obj
 
 
 def raise_errors_in(content: dict) -> None:
