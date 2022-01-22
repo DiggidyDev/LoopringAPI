@@ -15,7 +15,7 @@ client = loopring.Client(handle_errors=True, config=cfg)
 
 
 async def main():
-    """Submit a buy order for LRC @ 0.01 ETH/LRC"""
+    """Submit a buy order for 100 LRC @ 0.01 ETH/LRC"""
     
     symbols = ["LRC", "ETH"]
 
