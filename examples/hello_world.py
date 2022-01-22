@@ -1,9 +1,9 @@
 import asyncio
-from datetime import timedelta
 import json
+from datetime import timedelta
 
 import loopring
-from loopring.util.enums import Endpoints
+from loopring.util import Endpoints
 
 
 with open("account.json", "r") as fp:
@@ -22,11 +22,16 @@ async def main():
     orders = await client.get_multiple_orders(start=start)
     print(orders)
 
+    client.stop()  # Exit the program
+
 
 if __name__ == "__main__":
     try:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
+        loop.create_task(main())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print("Exiting...")
     finally:
         # Prevents errors complaining about unclosed client sessions
         asyncio.ensure_future(client.close())
