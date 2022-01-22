@@ -2,8 +2,9 @@ import asyncio
 import json
 import time
 from asyncio.events import AbstractEventLoop
+from copy import deepcopy
 from datetime import datetime
-from typing import List, Sequence, Tuple, Union
+from typing import List, Literal, Sequence, Tuple, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
@@ -33,6 +34,11 @@ from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSAS
 
 # TODO: Maybe accept `Fee` as the type for `max_fee` args, instead of `Token`
 
+
+_BLOCK_TYPEHINT = Union[int, Literal["finalized", "confirmed"]]
+_INTERVALS_TYPEHINT = Literal[
+    "1min", "5min", "15min", "30min", "1hr", "2hr", "4hr", "12hr", "1d", "1w"
+]
 
 
 class Client:
@@ -67,8 +73,9 @@ class Client:
     endpoint: ENDPOINT
     exchange: Exchange
     handle_errors: bool
-    offchain_ids: list        = [0] * 2 ** 16
-    order_ids: list           = [0] * 2 ** 16
+    offchain_ids: list
+    order_ids: list
+    pools: List[Pool] = []
     tokens: List[TokenConfig] = []
 
     def __init__(self,
@@ -119,6 +126,9 @@ class Client:
         self.publicX     = cfg.get("publicX", publicX)
         self.publicY     = cfg.get("publicY", publicY)
 
+        self.offchain_ids = [0] * 2 ** 16
+        self.order_ids = [0] * 2 ** 16
+
         self.chain_id = 5  # Testnet
 
         if self.endpoint == ENDPOINT.MAINNET:
@@ -146,27 +156,35 @@ class Client:
         """
         return self.__handle_errors
 
+    # TODO: Check order status as soon as order is submitted;
+    #       need to verify assumption in docs with `status` arg.
     async def cancel_order(self,
-                        *,
-                        client_order_id: str=None,
-                        orderhash: str=None
-                        ) -> PartialOrder:
-        """Cancel an order.
+            *,
+            client_order_id: str=None,
+            orderhash: str=None
+        ) -> PartialOrder:
+        """Cancel a submitted order.
+
+        The order hash can either be stored locally upon submission creation, or \
+            fetched with :meth:`~loopring.client.Client.get_multiple_orders()` using \
+            the `status` argument set to '`processing`'
 
         Args:
-            client_order_id (str): ...
-            orderhash (str): ...
+            client_order_id: A label to describe the order. This has no \
+                impact on trading.
+            orderhash: The order hash of a submitted order response.
 
         Returns:
-            :obj:`~loopring.order.PartialOrder`: ...
+            An object containing information about the cancelled order.  See \
+                :meth:`~loopring.client.Client.submit_order()`.
         
         Raises:
-            EmptyAPIKey: ...
-            InvalidAccountID: ...
-            InvalidAPIKey: ...
-            NoOrderToCancel: ...
-            OrderCancellationFailed: ...
-            UnknownError: ...
+            EmptyAPIKey: No API Key was provided in the request header.
+            InvalidAccountID: An invalid account ID was supplied.
+            InvalidAPIKey: An incorrect API Key was provided in the request header.
+            NoOrderToCancel: No order could be found matching the given critera.
+            OrderCancellationFailed: Your order cancellation request failed.
+            UnknownError: Something out of your control (probably) went wrong!
 
         """
 
@@ -180,12 +198,13 @@ class Client:
         req = Request("delete", self.endpoint, PATH.ORDER, params=params)
 
         helper = UrlEDDSASign(self.private_key, self.endpoint)
-        api_sig = helper.sign(req)
+        eddsa_signature = helper.sign(req)
 
         headers = {
             "X-API-KEY": self.api_key,
-            "X-API-SIG": api_sig
+            "X-API-SIG": eddsa_signature
         }
+
         async with self._session.delete(url, headers=headers, params=params) as r:
             raw_content = await r.read()
 
@@ -205,13 +224,41 @@ class Client:
             await self._session.close()
 
     async def exit_amm_pool(self,
-        *,
-        exit_tokens: ExitPoolTokens,
-        max_fee: int,
-        owner: str=None,
-        pool: Union[str, Pool],
-        valid_until: Union[int, datetime]=None) -> Transfer:
-        """Exit an AMM pool."""
+            *,
+            exit_tokens: ExitPoolTokens,
+            max_fee: int,
+            pool: Union[str, Pool, PoolSnapshot],
+            valid_until: Union[int, datetime]=None
+        ) -> Transfer:
+        """Exit an AMM pool.
+        
+        Args:
+            exit_tokens: The exit tokens with which to exit.  Bear in mind that the \
+                order of the `unpooled` tokens does matter.
+            max_fee: ... .
+            pool: The AMM pool you wish to exit.
+            valid_until: A UNIX timestamp or datetime object representing the time \
+                of expiry for the submitted order.  Please note that your order may \
+                be cancelled by the relayer if this date is shorter than a week in \
+                the future.  See \
+                `here <https://docs.loopring.io/en/basics/orders.html#timestamps>`_ \
+                for more info.
+        
+        Returns:
+            A transfer record containing information about the AMM exit event.
+        
+        Raise:
+            InconsistentTokens: Transfer token is inconsistent with the fee token.
+            InvalidArguments: Invalid arguments supplied.
+            InvalidExchangeID: Invalid exchange ID supplied.
+            InvalidNonce: Invalid nonce supplied.
+            InvalidTransferReceiver: Transfer receiver address is invalid.
+            InvalidTransferSender: Transfer sender address is invalid.
+            UnknownError: Something out of your control went wrong.
+            UnsupportedFeeToken: Provided fee token is unsupported.  See \
+                :meth:`~loopring.client.Client.get_token_configurations()`.
+            
+        """
 
         url = self.endpoint + PATH.AMM_EXIT
 
@@ -222,8 +269,8 @@ class Client:
         payload = {
             "exitTokens": exit_tokens.to_params(),
             "maxFee": max_fee,
-            "owner": owner or self.address,
-            "poolAddress": pool if isinstance(pool, str) else pool.address,
+            "owner": self.address,
+            "poolAddress": str(pool),
             "storageId": self.offchain_ids[exit_tokens.burned.id],
             "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
         }
@@ -259,15 +306,16 @@ class Client:
         """Returns data associated with the user's exchange account.
         
         Args:
-            address (str): ... .
+            address: The ethereum address belonging to the account of which you \
+                want information from.
         
         Returns:
-            :obj:`~loopring.account.Account`: ... .
+            An account containing all publicly available information.
         
         Raises:
-            AddressNotFound: ... .
-            UnknownError: ... .
-            UserNotFound: ... .
+            AddressNotFound: The ethereum address wasn't found.
+            UnknownError: Something out of of your control went wrong.
+            UserNotFound: User account not found.
 
         """
 
@@ -289,17 +337,17 @@ class Client:
 
             return account
 
-    async def get_amm_pool_balance(self, address: str) -> PoolSnapshot:
+    async def get_amm_pool_balance(self, pool: Union[str, Pool]) -> PoolSnapshot:
         """Get an AMM Pool's balance.
         
         Args:
-            address (str): ...
+            pool: The pool whose balance you want to query.
         
         Returns:
-            :obj:`~loopring.amm.PoolSnapshot
+            A pool snapshot containing LP token information and general pool data.
         
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
         
         """
 
@@ -309,7 +357,7 @@ class Client:
             "X-API-KEY": self.api_key
         }
         params = clean_params({
-            "poolAddress": address
+            "poolAddress": str(pool)
         })
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -326,12 +374,16 @@ class Client:
 
     async def get_amm_pool_configurations(self) -> List[Pool]:
         """Get all AMM Pool configurations.
-        
+
+        This function only needs to be called once, as the pools are stored in
+        local storage.  For longer-running clients, it is recommended to
+        periodically call this function to keep local storage pools up to date.
+
         Returns:
-            List[:obj:`~loopring.amm.Pool`]: ...
-        
+            A list containing all pools supported on the Loopring exchange.
+
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
 
         """
 
@@ -358,14 +410,41 @@ class Client:
                     verifying_contract=pool.address
                 )
                 pools.append(pool)
-            
+
+            self.pools = deepcopy(pools)
+
             return pools
 
+    # TODO: Find out how many trades are returned by default.
+    #       Also, maybe store `totalNum` from the response?
+    #       Remove EmptyUser and InvalidAccountID from docstring?
+    #       It doesn't make sense, given the args supplied
     async def get_amm_trade_history(self,
-        amm_pool: Union[str, Pool, PoolSnapshot],
-        limit: int=None,
-        offset: int=None) -> List[AMMTrade]:
-        """Get a pool's AMM trade history."""
+            amm_pool: Union[str, Pool, PoolSnapshot],
+            limit: int=None,
+            offset: int=None
+        ) -> List[AMMTrade]:
+        """Get a pool's AMM trade history.
+
+        Combining `limit` and `offset` together can be useful for implementing
+        pagination.
+        
+        Args:
+            amm_pool: The pool whose trade history you want to query.
+            limit: The number of trade records to be returned.
+            offset: Apply an offset when searching through the trade records.
+        
+        Returns:
+            A list of trades, capped to a length of `limit`.
+        
+        Raises:
+            EmptyAPIKey: No API Key has been supplied.
+            EmptyUser: No User ID has been supplied.
+            InvalidAccountID: The supplied Account ID was invalid.
+            InvalidAPIKey: The supplied API Key was invalid.
+            UnknownError: Something out of your control went wrong.
+
+        """
 
         url = self.endpoint + PATH.AMM_TRADES
 
@@ -390,22 +469,24 @@ class Client:
             
             return trades
 
+    # TODO: Remove unnecessary error codes?
     async def get_api_key(self) -> str:
-        """Get the API Key associated with an account.
-        
-        Requires private key for X-API-SIG header signing.
+        """Get the API Key associated with the account.
+
+        Your L2 wallet private key must be supplied in the client config in order
+        for the API's authentication to succeed.
 
         Returns:
             str: The API Key associated with the account ID.
 
         Raises:
-            EmptyAPIKey: ...
-            EmptySignature: ...
-            InvalidAccountID: ...
-            InvalidAPIKey: ...
-            InvalidSignature: ...
-            UnknownError: ...
-            UserNotFound: ...
+            EmptyAPIKey: No API Key has been supplied.
+            EmptySignature: No API Signature was supplied.
+            InvalidAccountID: An invalid Account ID was supplied.
+            InvalidAPIKey: An invalid API Key was supplied.
+            InvalidSignature: An invalid signature was supplied in the header.
+            UnknownError: Something went wrong out of your control.
+            UserNotFound: User wasn't found.
 
         """
 
@@ -439,20 +520,18 @@ class Client:
 
             return content["apiKey"]
 
-    async def get_block(self,
-        *,
-        id_or_status: str="confirmed") -> Block:
-        """Get block info by ID or status.
+    async def get_block(self, *, id_or_status: _BLOCK_TYPEHINT="confirmed") -> Block:
+        """Get a layer 2 block by ID or status.
         
         Args:
-            id_or_status (str): Any of the following; '`finalized`', '`confirmed`', \
-                '`12345`'. Defaults to '`confirmed`'.
+            id_or_status: Any of the following values are accepted; '`finalized`', \
+                '`confirmed`', '`12345`'. Defaults to '`confirmed`'.
         
         Returns:
-            :obj:`~loopring.exchange.Block`: ...
+            A layer 2 block, with a list of transactions (txs) belonging to it.
         
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
         
         """
 
@@ -462,7 +541,7 @@ class Client:
             "X-API-KEY": self.api_key
         }
         params = clean_params({
-            "id": id_or_status
+            "id": str(id_or_status)
         })
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -481,10 +560,10 @@ class Client:
         """Get configurations of loopring's exchange.
 
         Returns:
-            :obj:`~loopring.exchange.Exchange`: ...
+            The exchange configuration for the currently connected endpoint.
 
         Raises:
-            UnknownError: ... .
+            UnknownError: Something went wrong out of your control
 
         """
 
@@ -505,15 +584,19 @@ class Client:
     async def get_fiat_prices(self, currency: str="USD") -> List[Price]:
         """Fetches fiat prices for all tokens supported on Loopring.
 
+        Note:
+            Check the `updated_at` property of the returned prices, as they could be
+            out of sync by a couple of days.
+
         Args:
             currency (str): All supported values: "`USD`", "`CNY`", "`JPY`", 
                 "`EUR`", "`GBP`", "`HKD`". Defaults to "`USD`".
         
         Returns:
-            List[:obj:`~loopring.token.Price`]: ... .
+            All prices of supported tokens, in the given `currency`.
 
         Raises:
-            UnknownError: ...
+            UnknownError: Something went wrong out of your control.
 
         """
 
@@ -538,32 +621,35 @@ class Client:
             
             return prices
 
-    async def get_market_candlestick(self,
-        market: str="LRC-ETH",
-        interval: str="5min",
-        *,
-        start: Union[int, datetime]=None,
-        end: Union[int, datetime]=None,
-        limit: int=None) -> List[Candlestick]:
+    async def get_market_candlesticks(self,
+            market: Union[str, Market]="LRC-ETH",
+            interval: _INTERVALS_TYPEHINT="5min",
+            *,
+            end: Union[int, datetime]=None,
+            limit: int=None,
+            start: Union[int, datetime]=None
+        ) -> List[Candlestick]:
         """Get candlestick data for a given `market` (trading pair).
 
         Args:
-            market (str): Defaults to "`LRC-ETH`".
-            interval (str): All supported values;
-                `1min`, `5min`, `15min`, `30min`, `1hr`, `2hr`, `4hr`,
-                `12hr`, `1d`, `1w`. Defaults to `5min`.
-            start (int): ... .
-            end (int): ... .
-            limit (int): Number of datapoints - if more are available, only
-                the first limit data points will be returned.
+            market: Defaults to "`LRC-ETH`".  See all possible trading pairs in \
+                :meth:`~loopring.client.Client.get_market_configurations()`.
+            interval: Defaults to `5min`.
+            start: The earliest time from which candlesticks can be returned (i.e. \
+                from `start` to `end`, or from `start` to the current time if `end` \
+                is `None`).
+            end: The latest time of which a candlestick could indicate.
+            limit: Number of candlesticks returned - if more are available, only
+                the first, `limit` number data points will be returned.
         
         Returns:
-            List[:obj:`~loopring.market.Candlestick`]: ... .
+            A list of candlestick objects, capped at `limit` sticks, between `start`
+            and `end`.
 
         Raises:
-            InvalidArguments: ...
+            InvalidArguments: Supplied arguments are invalid.
             TypeError: From timestamp validation.
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
             ValidationException: From timestamp validation.
 
         """
@@ -593,14 +679,15 @@ class Client:
 
             return candlesticks
 
+    # TODO: Add markets to local storage?
     async def get_market_configurations(self) -> List[Market]:
         """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
         Returns:
-            List[:obj:`~loopring.market.Market`]: All the markets.
+            All markets listed on the exchange.
         
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
 
         """
 
@@ -622,33 +709,37 @@ class Client:
             return markets
 
     async def get_market_orderbook(self,
-        market: str="LRC-ETH",
-        *,
-        price_aggregation: int=2,
-        limit: int=50) -> OrderBook:
+            market: Union[str, Market]="LRC-ETH",
+            *,
+            depth: int=2,
+            limit: int=50
+        ) -> OrderBook:
         """Get the orderbook of a specific market (trading pair).
 
         Args:
-            limit (int): Default 50.
-            market (str): Default 'LRC-ETH'.
-            price_aggregation (int): Default 2.
+            limit: The maximum number of orders (bids/asks combined) to receive.  \
+                Defaults to 50.
+            market: The `market` (trading pair) whose orderbook you want to receive.  \
+                Defaults to 'LRC-ETH'.
+            depth: The order book's aggregation level - the larger, the larger the \
+                depth will be.  Defaults to 2.
         
         Returns:
-            :obj:`loopring.order.Orderbook`: ... .
+            An orderbook containing bids and asks.
 
         Raises:
-            OrderbookUnsupportedMarket: ...
-            UnknownError: ...
-            UnsupportedDepthLevel: ...
+            OrderbookUnsupportedMarket: An unsupported trading pair was supplied.
+            UnknownError: Something out of your control went wrong.
+            UnsupportedDepthLevel: An unsupported price aggregation
 
         """
 
         url = self.endpoint + PATH.DEPTH
 
         params = {
-            "level": price_aggregation,
+            "level": depth,
             "limit": limit,
-            "market": market
+            "market": str(market)
         }
 
         async with self._session.get(url, params=params) as r:
@@ -663,19 +754,34 @@ class Client:
 
             return orderbook
 
-    async def get_market_ticker(self, market: str="LRC-ETH") -> List[Ticker]:
+    async def get_market_ticker(self,
+            market: Union[str, Market, List[Market]]="LRC-ETH"
+        ) -> List[Ticker]:
         """Get a ticker for a specific market or multiple markets.
-        
+
+        Args:
+            market: A market, or multiple markets, whose ticker(s) you want to \
+                receive.  If passing multiple trading pairs as a string, you may \
+                separate with commas;
+                `"LRC-ETH,LINK-ETH,HEX-ETH"`
+
+        Returns:
+            A list of tickers, matching the order of supplied markets if multiple 
+            markets were supplied.
+
         Raises:
-            InvalidArguments: ...
-            UnknownError: ...
+            InvalidArguments: A supplied argument was invalid.
+            UnknownError: Something out of your control went wrong.
 
         """
+
+        if isinstance(market, list):
+            market = ",".join([str(m) for m in market])
 
         url = self.endpoint + PATH.TICKER
 
         params = {
-            "market": market
+            "market": str(market)
         }
 
         async with self._session.get(url, params=params) as r:
@@ -693,48 +799,44 @@ class Client:
 
             return tickers
 
+    # TODO: Add order types enum?
     async def get_multiple_orders(self, *,
-                                end: Union[int, datetime]=None,
-                                limit: int=50,
-                                market: str=None,
-                                offset: int=0,
-                                order_types: str=None,
-                                side: str=None,
-                                start: Union[int, datetime]=None,
-                                status: str=None,
-                                trade_channels: str=None) -> List[Order]:
+            end: Union[int, datetime]=None,
+            limit: int=50,
+            market: Union[str, Market]=None,
+            offset: int=0,
+            order_types: str=None,
+            side: str=None,
+            start: Union[int, datetime]=None,
+            status: str=None,
+            trade_channels: str=None
+        ) -> List[Order]:
         """Get a list of orders satisfying certain criteria.
 
         Note:
-            All arguments are optional. \ 
-            All string-based arguments are case-insensitive. For example,
-            `trade_channels='MIXED'` returns the same results as `trade_channels='mIxEd'`.
+            All arguments are optional. All string-based arguments are
+            case-insensitive. For example, `trade_channels='MIXED'` returns the
+            same results as `trade_channels='mIxEd'`.
 
         Args:
-            end (Union[int, :class:`~datetime.datetime`]): The upper bound of an order's creation timestamp,
-                in milliseconds. Defaults to `0`.
-            limit (int): The maximum number of orders to be returned. Defaults
-                to `50`.
-            market (str): The trading pair. Example: `'LRC-ETH'`.
-            offset (int): The offset of orders. Defaults to `0`. \            
-            order_types (str): Types of orders available:
+            end: The upper bound of an order's creation time.
+            limit: The maximum number of orders to be returned. Defaults to `50`.
+            market: The trading pair. Example: `'LRC-ETH'`.
+            offset: The offset of orders. Defaults to `0`.
+            order_types: Types of orders available:
                 `'LIMIT_ORDER'`, `'MAKER_ONLY'`, `'TAKER_ONLY'`, `'AMM'`. 
-            side (str): The type of order made, a `'BUY'` or `'SELL'`.
-            start (Union[int, :class:`~datetime.datetime`): The lower bound of an
-                order's creation timestamp, in milliseconds. Defaults to `0`.
-            status (str): The order's status:
-                `'PROCESSING'`, `'PROCESSED'`, `'FAILED'`, `'CANCELLED'`, `'CANCELLING'`,
-                `'EXPIRED'`.
-
-                Multiple statuses can be selected:
+            side: The type of order made, a `'BUY'` or `'SELL'`.
+            start: The lower bound of an order's creation time.
+            status: The order's status: \
+                `'PROCESSING'`, `'PROCESSED'`, `'FAILED'`, `'CANCELLED'`, \
+                `'CANCELLING'`, `'EXPIRED'`. Multiple statuses can be selected: \
                 `'CANCELLING, CANCELLED'`
-            trade_channels (str): The channel which said trade was made in:
-                `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
+            trade_channels: The channel which said trade was made in: `'ORDER_BOOK'`, \
+                `'AMM_POOL'`, `'MIXED'`.
         
         Returns:
-            List[:class:`~loopring.order.Order`]: A :obj:`list` of
-            :class:`~loopring.order.Order` objects on a successful query.
-            The returned list could be empty if no orders met the given conditions.
+            A list of orders on a successful query. The returned list could be empty
+            if no orders met the given conditions.
 
         Raises:
             EmptyAPIKey: The API Key cannot be empty.
@@ -786,19 +888,14 @@ class Client:
         ) -> dict:
         """Get the next storage ID.
 
-        Fetches the next order ID for a given sold token. If the need
-        arises to repeatedly place orders in a short span of time, the
-        order ID can be initially fetched through the API and then managed
-        locally.
-        Each new order ID can be derived from adding 2 to the last one.
+        Fetches the next order ID for a given token.
         
         Args:
-            sell_token_id (Union[int, :int:`~loopring.token.Token`): The unique
-                identifier of the token which the user wants to sell in the next
-                order.
+            sell_token_id: The unique identifier of the token which the user wants
+            to sell in the next order.
 
         Returns:
-            :obj:`dict`: A :obj:`dict` containing the `orderId` and `offchainId`.
+            A :obj:`dict` containing the `orderId` and `offchainId`.
 
         Raises:
             EmptyAPIKey: No API Key was supplied.
@@ -806,8 +903,7 @@ class Client:
             InvalidAPIKey: Supplied API Key was deemed invalid.
             InvalidArguments: Invalid arguments supplied.
             TypeError: 'sell_token_id' argument supplied was not of type :class:`int`.
-            UnknownError: Something has gone wrong. Probably out of
-                your control. Unlucky.
+            UnknownError: Something out of your control has gone wrong.
             UserNotFound: Didn't find the user from the given account ID.
 
         """
@@ -839,38 +935,40 @@ class Client:
             return content
 
     async def get_onchain_withdrawal_history(self,
-        *,
-        account_id: int=None,
-        end: Union[int, datetime]=None,
-        hashes: Union[str, Sequence[str]]=None,
-        limit: int=None,
-        offset: int=None,
-        start: Union[int, datetime]=None,
-        status: str=None,
-        token_symbol: str=None,
-        withdrawal_types: str=None) -> List[WithdrawalHashData]:
+            *,
+            account_id: int=None,
+            end: Union[int, datetime]=None,
+            hashes: Union[str, Sequence[str]]=None,
+            limit: int=None,
+            offset: int=None,
+            start: Union[int, datetime]=None,
+            status: str=None,
+            token_symbol: str=None,
+            withdrawal_types: str=None
+        ) -> List[WithdrawalHashData]:
         """Get a user's onchain withdrawal history.
         
         Args:
-            account_id (int): ... .
-            end (Union[int, :class:`~datetime.datetime`]): ... .
-            hashes (Union[str, Sequence[str]]): ... .
-            limit (int): ... .
-            offset (int): ... .
-            start (Union[int, :class:`~datetime.datetime`]): ... .
-            status (str): ... .
-            token_symbol (str): ... .
-            withdrawal_types: ... .
+            account_id: The Account ID of the user whose withdrawal history you want \
+                to query.
+            end: --
+            hashes: --
+            limit: The number of withdrawal records to get.
+            offset: 
+            start:
+            status:
+            token_symbol:
+            withdrawal_types:
 
         Returns:
-            List[:obj:`~loopring.exchange.WithdrawalHashData`]: ...
+            A list of 
 
         Raises:
-            EmptyAPIKey: ...
-            EmptyUser: ...
-            InvalidAccountID: ...
-            InvalidAPIKey: ...
-            UnknownError: ...
+            EmptyAPIKey: No API Key was supplied.
+            EmptyUser: No Account ID was supplied.
+            InvalidAccountID: An invalid Account ID was supplied.
+            InvalidAPIKey: An invalid API Key was supplied.
+            UnknownError: Something out of your control went wrong.
 
         """
 
@@ -918,7 +1016,7 @@ class Client:
                 the given orderhash.
 
         Raises:
-            InvalidArguments: Missing the 'orderhash' argument.
+            InvalidArguments: ...
 
         """
 
@@ -1066,6 +1164,7 @@ class Client:
             
             return trades
 
+    # TODO: deal with timezone differences
     # @ratelimit(5, 1)  # Work in progress
     async def get_relayer_time(self) -> datetime:
         """Get relayer's current time as a datetime object.
@@ -1120,7 +1219,7 @@ class Client:
                 token_config = TokenConfig(**t)
                 token_confs.append(token_config)
             
-            self.tokens = token_confs
+            self.tokens = deepcopy(token_confs)
             
             return token_confs
 
@@ -1590,8 +1689,8 @@ class Client:
         """Get the current trading pair (market)'s  fees.
         
         Args:
-            account_id (int): ...
-            market (str): ...
+            account_id: 
+            market: The trading pair, or market, to receive fees information about.
         
         Returns:
             Tuple[str, :class:`~datetime.datetime`, List[:obj:`~loopring.token.RateInfo`]]: ...
@@ -1836,7 +1935,7 @@ class Client:
             "extraData": extra_data,
             "fastWithdrawalMode": fast_withdrawal_mode,
             "hashApproved": hash_approved,
-            "onChainDataHash": onchain_data_hash,
+            "onchainDataHash": onchain_data_hash,
             "owner": owner,
             "maxFee": max_fee.to_params(),
             "minGas": min_gas,
@@ -1902,7 +2001,7 @@ class Client:
                         valid_until: Union[int, datetime]=None
                         ) -> PartialOrder:
         """Submit an order.
-        
+
         Args:
             affiliate (str): An account ID to receive a share of the
                 order's fee. Don't supply this argument if you want to support
