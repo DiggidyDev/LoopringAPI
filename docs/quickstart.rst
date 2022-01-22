@@ -23,32 +23,64 @@ then be able to copy your account details.
 Hello world!
 ------------
 
+Once you've copied your account details, paste them into a file like so (feel free to \
+remove the ``level`` key):
+
+``account.json``
+~~~~~~~~~~~~~~~~
+
+.. code-block:: json
+
+    {
+    "account_id": 12345,
+    "address": "0x...",
+    "api_key": "abc...",
+    "nonce": 1,
+    "private_key": "0x...",
+    "publicX": "0x...",
+    "publicY": "0x..."
+    }
+
+
+``main.py``
+~~~~~~~~~~~
+
 .. code-block:: python
 
     import asyncio
+    import json
+    from datetime import timedelta
 
     import loopring
-    from loopring.util.enums import Endpoints
+    from loopring.util import Endpoints
 
 
-    cfg = {
-        "account_id": 12345,
-        "api_key": "",
-        "endpoint": Endpoints.MAINNET
-    }
+    with open("account.json", "r") as fp:
+        cfg = json.load(fp)
 
-    client = loopring.Client(config=cfg)
+    cfg["endpoint"] = Endpoints.MAINNET
 
+    client = loopring.Client(handle_errors=True, config=cfg)
 
     async def main():
-        resp = await client.get_next_storage_id(0)
-        print(resp)
+        
+        # Get orders made in the past 8 days
+        rt = await client.get_relayer_time()
+        start = rt - timedelta(8)
+
+        orders = await client.get_multiple_orders(start=start)
+        print(orders)
+
+        client.stop()  # Exit the program
 
 
     if __name__ == "__main__":
         try:
             loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
+            loop.create_task(main())
+            loop.run_forever()
+        except KeyboardInterrupt:
+            print("Exiting...")
         finally:
             # Prevents errors complaining about unclosed client sessions
             asyncio.ensure_future(client.close())
