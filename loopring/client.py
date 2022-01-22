@@ -2083,11 +2083,13 @@ class Client:
                 await client.get_next_storage_id(token=LRC)
                 await client.get_next_storage_id(token=ETH)
 
-                await client.submit_order("buy", token=LRC, with=ETH, ...)
+                await client.submit_order("buy", token=LRC, using=ETH, ...)
 
         Args:
             affiliate: An account ID to receive a share of the order's fee.
             client_order_id: An arbitrary, unique client-side order ID.
+            in_return_for: If selling, this is the token that you'll be receiving \
+                in return for your ``target`` token (i.e. the token you're buying).
             max_fee_bips: Maximum order fee that the user can accept, \
                 value range (in ten thousandths) 1 ~ 63.
             order_type: The type of order: `'LIMIT_ORDER'`, `'AMM'`, \
@@ -2099,6 +2101,8 @@ class Client:
                 specify the taker's address.
             trade_channel: The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
+            using: If buying, this is the token you'll be giving in exchange \
+                for the one you wish to buy.
             valid_until: The order expiry \
                 time, in seconds.
 
