@@ -24,6 +24,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Finish off REST API endpoints.
 - [ ] Finish documentation for all the endpoints.
 - [ ] Make some util functions for accessing local storage objects.
+- [ ] Let client deal with all timezone/time difference related issues.
 - [ ] Look into turning prices into floats instead of strings.
 - [ ] Make a helper for volume conversion.
 - [ ] Make a `CONTRIBUTING.md`
