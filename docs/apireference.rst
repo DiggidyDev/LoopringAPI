@@ -26,15 +26,30 @@ with Loopring's API.
 
 Client
 ------
+Please note that some of the client's methods have the possibility of raising some
+error codes that in theory shouldn't be raised.  Instead of removing these, I've kept
+true to the Official Documentation and made notes of all possible errors from each
+endpoint.
+
+In the future these unnecessary errors may be removed from this documentation to
+minimise any confusion and irrelevant information.
+
 .. automodule:: loopring.client
    :members:
    :undoc-members: handle_errors
+
+
+
 
 
 Market
 ------
 .. autoclass:: loopring.market.Market
    :members:
+
+
+
+
 
 
 Order
@@ -58,10 +73,17 @@ Volume
    :members:
 
 
+
+
+
 Price
 -----
 .. autoclass:: loopring.token.Price
    :members:
+
+
+
+
 
 
 Token
@@ -69,3 +91,18 @@ Token
 .. autoclass:: loopring.token.Token
    :members:
    :undoc-members:
+
+GasAmount
+~~~~~~~~~
+.. autoclass:: loopring.token.GasAmount
+   :members:
+
+OrderAmount
+~~~~~~~~~~~
+.. autoclass:: loopring.token.OrderAmount
+   :members:
+
+TokenConfig
+~~~~~~~~~~~
+.. autoclass:: loopring.token.TokenConfig
+   :members:
