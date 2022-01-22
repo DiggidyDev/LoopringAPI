@@ -913,9 +913,34 @@ class Client:
         ) -> Dict[_KT_STORAGE, int]:
         """Get the next storage ID.
 
-        Fetches the next order ID for a given token.  You should call this before
-        making any interaction with onchain or offchain requests.
+        When making any offchain or order request for the first time each session,
+        it's important to call this method to update the cached storage ID
+        information.
         
+        Once you've queried the storage ID for a token, you won't need
+        to worry about making another query for the same token during the program's
+        lifetime.  There is an exception to this - for longer running programs that
+        don't restart often, it's a good idea to periodically make this API request
+        in order to keep in sync with the relayer.
+
+        Examples:
+            If you know ahead of time which tokens you'll be interacting with on the
+            blockchain, you're able to query those tokens concurrently to cut down
+            on program runtime;
+
+            .. code-block:: python3
+
+                symbols = ["LRC", "ETH", "LINK"]
+                tokens = [fetch(client.tokens, symbol=s) for s in symbols]
+
+                await asyncio.gather(*[client.get_next_storage_id(token=t) for t in tokens])
+        
+            It's important to not do this with too many symbols at once, as you
+            could be ratelimited (TODO: check info on ratelimiting!).
+
+            .. seealso:: Coroutines can be executed concurrently using
+                :py:func:`asyncio.gather()`
+
         Args:
             max_next: ... .
             token: The unique identifier of the token which the user wants \
@@ -1804,6 +1829,10 @@ class Client:
 
             return rate
 
+    def stop(self) -> None:
+        """Exit out of the program."""
+        self._loop.stop()
+
     async def submit_internal_transfer(self,
             *,
             client_id: str=None,
@@ -2021,6 +2050,9 @@ class Client:
 
         Note:
             Loopring doesn't support market price orders.
+            
+            See :meth:`~loopring.client.Client.get_next_storage_id()` for more
+            information on storage IDs.
 
         Examples:
             The method for placing a buy order for 100 LRC @ 0.01 ETH/LRC is as
@@ -2030,13 +2062,15 @@ class Client:
                 be expressed in their smallest unit.
             - Multiply the quantity of tokens by 10 raised to the power of \
                 ``decimals`` to get the floating point value.
-            - Pass this into a dictionary, with the token's ID, and send it along \
-                in a request to the order submission endpoint.
-            
+            - Pass this into a dictionary, with the token's ID, next available \
+                storage ID, and send it along in a request to the order submission \
+                endpoint.
+
             That can be a bit of a headache, so that's what this code is doing
             behind the scenes:
 
             .. code-block:: python3
+
 
                 # from loopring.util.helpers import fetch
                 lrc_cfg = fetch(client.tokens, symbol="LRC")
@@ -2045,6 +2079,9 @@ class Client:
                 # from loopring import Token
                 LRC = Token.from_quantity(100, lrc_cfg)
                 ETH = Token.from_quantity(1, eth_cfg)
+
+                await client.get_next_storage_id(token=LRC)
+                await client.get_next_storage_id(token=ETH)
 
                 await client.submit_order("buy", token=LRC, with=ETH, ...)
 
