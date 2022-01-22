@@ -32,7 +32,7 @@ async def main():
     ETH = Token.from_quantity(1, eth_cfg)
 
     # Request to submit the order
-    submitted = await client.submit_order("buy", token=LRC, using=ETH, max_fee_bips=50)
+    submitted = await client.submit_order("buy", LRC, using=ETH, max_fee_bips=50)
 
     # See the order's status
     print(repr(submitted))
