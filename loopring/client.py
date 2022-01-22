@@ -2083,7 +2083,7 @@ class Client:
                 await client.get_next_storage_id(token=LRC)
                 await client.get_next_storage_id(token=ETH)
 
-                await client.submit_order("buy", token=LRC, using=ETH, ...)
+                await client.submit_order("buy", LRC, using=ETH, ...)
 
         Args:
             affiliate: An account ID to receive a share of the order's fee.
@@ -2099,6 +2099,7 @@ class Client:
                 order.
             taker: Used by the P2P order, where the user needs to \
                 specify the taker's address.
+            target: The main subject of a buy or sell order.
             trade_channel: The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
             using: If buying, this is the token you'll be giving in exchange \
