@@ -16,6 +16,9 @@ class Fee:
         for k in data.keys():
             setattr(self, to_snake_case(k), data[k])
     
+    def __int__(self) -> int:
+        return self.fee
+    
     def __repr__(self) -> str:
         return auto_repr(self)
     
@@ -166,34 +169,6 @@ class Price:
             f"{self.price}"
 
 
-class Token:
-    """Token class.
-    
-    Args:
-        id (int): ...
-        volume (int): ...
-
-    """
-
-    id: int
-    volume: int
-
-    def __getitem__(self, __name) -> Any:
-        return self.__dict__[__name]
-
-    def __init__(self, *, id: int=None, volume: int=None):
-        self.id = id
-        self.volume = volume
-    
-    def __repr__(self) -> str:
-        return auto_repr(self)
-    
-    def to_params(self):
-        """Converting any attributes back to the fields required for requests."""
-
-        return {"tokenId": self.__dict__["id"], "volume": self.__dict__["volume"]}
-
-
 class TokenConfig:
     """Token configuration model class.
     
@@ -231,7 +206,7 @@ class TokenConfig:
     def __init__(self, **data):
         for k in data.keys():
 
-            if k == "gasAmount":
+            if k == "gasAmounts":
                 setattr(self, to_snake_case(k), GasAmount(**data[k]))
 
             elif k in ("luckyTokenAmounts", "orderAmounts"):
@@ -240,9 +215,51 @@ class TokenConfig:
             else:
                 setattr(self, to_snake_case(k), data[k])
     
+    def __int__(self) -> int:
+        return self.token_id
+    
     def __repr__(self) -> str:
         return auto_repr(self)
     
     def __str__(self) -> str:
         return f"{self.name} ({self.symbol})"
+
+
+class Token:
+    """Token class.
+    
+    Args:
+        id (int): ...
+        volume (str): ...
+
+    """
+
+    id: int
+    volume: str
+
+    def __getitem__(self, __name) -> Any:
+        return self.__dict__[__name]
+
+    def __init__(self, *, id: int=None, volume: str=None):
+        self.id = id
+        self.volume = volume
+    
+    def __int__(self) -> int:
+        return self.id
+    
+    def __repr__(self) -> str:
+        return auto_repr(self)
+    
+    @classmethod
+    def from_quantity(cls, quantity: float, cfg: TokenConfig) -> "Token":
+
+        print(cfg.decimals, cfg.precision, cfg.precision_for_order)
+        vol = quantity * 10 ** cfg.decimals
+        
+        return cls(id=cfg.token_id, volume=vol)
+
+    def to_params(self):
+        """Converting any attributes back to the fields required for requests."""
+
+        return {"tokenId": self.__dict__["id"], "volume": self.__dict__["volume"]}
 
