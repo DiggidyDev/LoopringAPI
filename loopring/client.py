@@ -1,10 +1,10 @@
 import asyncio
 import json
+import logging
 import time
 from asyncio.events import AbstractEventLoop
-from copy import deepcopy
 from datetime import datetime
-from typing import List, Literal, Sequence, Tuple, Union
+from typing import Dict, List, Literal, Sequence, Tuple, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
@@ -39,13 +39,15 @@ _BLOCK_TYPEHINT = Union[int, Literal["finalized", "confirmed"]]
 _INTERVALS_TYPEHINT = Literal[
     "1min", "5min", "15min", "30min", "1hr", "2hr", "4hr", "12hr", "1d", "1w"
 ]
+_KT_STORAGE = Literal["offchainId", "orderId"]
+_SIDE = Literal["buy", "sell"]
 
 
 class Client:
     """The main class interacting with Loopring's API endpoints.
 
     .. _Examples: quickstart.html
-    
+
     Args:
         account_id (int): The ID of the account belonging to the API Key.
         api_key (str): The API Key associated with your L2 account.
@@ -73,10 +75,10 @@ class Client:
     endpoint: ENDPOINT
     exchange: Exchange
     handle_errors: bool
-    offchain_ids: list
-    order_ids: list
-    pools: List[Pool] = []
-    tokens: List[TokenConfig] = []
+    markets: Dict[str, Market] = {}
+    pools: Dict[str, Pool] = {}
+    storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
+    tokens: Dict[int, TokenConfig] = {}
 
     def __init__(self,
             account_id: int=None,
@@ -126,9 +128,6 @@ class Client:
         self.publicX     = cfg.get("publicX", publicX)
         self.publicY     = cfg.get("publicY", publicY)
 
-        self.offchain_ids = [0] * 2 ** 16
-        self.order_ids = [0] * 2 ** 16
-
         self.chain_id = 5  # Testnet
 
         if self.endpoint == ENDPOINT.MAINNET:
@@ -136,6 +135,11 @@ class Client:
 
         self._loop: AbstractEventLoop = asyncio.get_event_loop()
         self._session = aiohttp.ClientSession(loop=self._loop)
+
+        # I had the option to run this concurrently in a different thread,
+        # but decided it would be best to have the initialisation step be
+        # blocking so the user's requests don't go through until it's safe
+        self._loop.run_until_complete(self.__init_local_storage())
 
     @property
     def handle_errors(self) -> bool:
@@ -289,7 +293,7 @@ class Client:
 
         payload["eddsaSignature"] = eddsa_signature
 
-        self.offchain_ids[exit_tokens.burned.id] += 2
+        self.storage_ids[exit_tokens.burned.id]["offchainId"] += 2
 
         async with self._session.post(url, headers=headers, json=payload) as r:
             raw_content = await r.read()
@@ -386,6 +390,7 @@ class Client:
             UnknownError: Something out of your control went wrong.
 
         """
+        logging.debug("Initialising pool config...")
 
         url = self.endpoint + PATH.AMM_POOLS
 
@@ -411,7 +416,9 @@ class Client:
                 )
                 pools.append(pool)
 
-            self.pools = deepcopy(pools)
+                self.pools[pool.market] = pool
+
+            logging.debug("Finished initialising pool config...")
 
             return pools
 
@@ -567,6 +574,8 @@ class Client:
 
         """
 
+        logging.debug("Initialising exchange config...")
+
         url = self.endpoint + PATH.EXCHANGES
 
         async with self._session.get(url) as r:
@@ -578,6 +587,18 @@ class Client:
                 raise_errors_in(content)
             
             exchange = Exchange(**content)
+
+            self.exchange = exchange
+
+            if not self.__exchange_domain_initialised:
+                EIP712.init_env(
+                    chain_id=self.exchange.chain_id,
+                    verifying_contract=str(self.exchange)
+                )
+
+                self.__exchange_domain_initialised = False
+            
+            logging.debug("Finished initialising exchange config...")
 
             return exchange
 
@@ -679,7 +700,6 @@ class Client:
 
             return candlesticks
 
-    # TODO: Add markets to local storage?
     async def get_market_configurations(self) -> List[Market]:
         """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
@@ -690,6 +710,8 @@ class Client:
             UnknownError: Something out of your control went wrong.
 
         """
+
+        logging.debug("Initialising market config...")
 
         url = self.endpoint + PATH.MARKETS
 
@@ -704,7 +726,12 @@ class Client:
             markets = []
 
             for m in content["markets"]:
-                markets.append(Market(**m))
+                market = Market(**m)
+                markets.append(market)
+
+                self.markets[market.market] = market
+
+            logging.debug("Finished initialising market config...")
             
             return markets
 
@@ -879,20 +906,20 @@ class Client:
 
             return orders
 
-    # TODO: Return obj instead of dict?
     async def get_next_storage_id(self,
             *,
-            account_id: int=None,
             max_next: int=None,
-            sell_token_id: Union[int, Token]
-        ) -> dict:
+            token: Union[int, Token, TokenConfig]
+        ) -> Dict[_KT_STORAGE, int]:
         """Get the next storage ID.
 
-        Fetches the next order ID for a given token.
+        Fetches the next order ID for a given token.  You should call this before
+        making any interaction with onchain or offchain requests.
         
         Args:
-            sell_token_id: The unique identifier of the token which the user wants
-            to sell in the next order.
+            max_next: ... .
+            token: The unique identifier of the token which the user wants \
+                to sell in the next order.
 
         Returns:
             A :obj:`dict` containing the `orderId` and `offchainId`.
@@ -902,35 +929,31 @@ class Client:
             InvalidAccountID: Supplied account ID was deemed invalid.
             InvalidAPIKey: Supplied API Key was deemed invalid.
             InvalidArguments: Invalid arguments supplied.
-            TypeError: 'sell_token_id' argument supplied was not of type :class:`int`.
+            TypeError: A given argument was an invalid type.
             UnknownError: Something out of your control has gone wrong.
             UserNotFound: Didn't find the user from the given account ID.
 
         """
-
-        if isinstance(sell_token_id, Token):
-            sell_token_id = sell_token_id.id
 
         url = self.endpoint + PATH.STORAGE_ID
         headers = {
             "X-API-KEY": self.api_key
         }
         params = clean_params({
-            "accountId": account_id or self.account_id,
-            "sellTokenId": sell_token_id,
+            "accountId": self.account_id,
+            "sellTokenId": int(token),
             "maxNext": max_next
         })
 
         async with self._session.get(url, headers=headers, params=params) as r:
             raw_content = await r.read()
 
-            content: dict = json.loads(raw_content.decode())
+            content: Dict[_KT_STORAGE, int] = json.loads(raw_content.decode())
 
             if self.handle_errors:
                 raise_errors_in(content)
             
-            self.order_ids[sell_token_id]    = content["orderId"]
-            self.offchain_ids[sell_token_id] = content["offchainId"]
+            self.storage_ids[int(token)] = content
 
             return content
 
@@ -1199,9 +1222,11 @@ class Client:
             List[:obj:`~loopring.token.TokenConfig`]: Token configs.
         
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
 
         """
+
+        logging.debug("Initialising token config...")
 
         url = self.endpoint + PATH.TOKENS
 
@@ -1218,8 +1243,14 @@ class Client:
             for t in content:
                 token_config = TokenConfig(**t)
                 token_confs.append(token_config)
-            
-            self.tokens = deepcopy(token_confs)
+
+                self.tokens[token_config.token_id] = token_config
+                self.storage_ids[token_config.token_id] = {
+                    "offchainId": 0,
+                    "orderId": 1
+                }
+
+            logging.debug("Finished initialising token config...")
             
             return token_confs
 
@@ -1552,41 +1583,41 @@ class Client:
             
             return transfers
 
-    async def init_exchange_configuration(self) -> None:
-        """Initialise the exchange config for L1 requests."""
-        self.exchange = await self.get_exchange_configurations()
+    async def __init_local_storage(self) -> None:
+        """Initialise all local storage."""
 
-        if not self.__exchange_domain_initialised:
-            EIP712.init_env(
-                chain_id=self.exchange.chain_id,
-                verifying_contract=str(self.exchange)
-            )
+        configs = [
+            self.get_amm_pool_configurations(),
+            self.get_exchange_configurations(),
+            self.get_market_configurations(),
+            self.get_token_configurations()
+        ]
 
-            self.__exchange_domain_initialised = True
+        gathered = await asyncio.gather(*configs, return_exceptions=True)
+
+        for result in gathered:
+            if isinstance(result, Exception):
+                raise result
+
+        logging.info("Finished local storage initialisation")
 
     async def join_amm_pool(self,
-        *,
-        fee: Union[int, Fee],
-        join_tokens: JoinPoolTokens,
-        owner: str=None,
-        pool: Union[str, Pool],
-        storage_ids: List[int]=None,
-        valid_until: Union[int, datetime]=None) -> Transfer:
+            *,
+            fee: Union[int, Fee],
+            join_tokens: JoinPoolTokens,
+            pool: Union[str, Pool],
+            valid_until: Union[int, datetime]=None
+        ) -> Transfer:
         """Join an AMM Pool."""
-
-        supplied_storage_ids = True
 
         if valid_until is None:
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
         
-        if not storage_ids:
-            supplied_storage_ids = False
-            assert len(join_tokens.pooled) == 2
+        assert len(join_tokens.pooled) == 2
 
-            storage_ids = [
-                self.offchain_ids[join_tokens.pooled[0].id],
-                self.offchain_ids[join_tokens.pooled[1].id]
-            ]
+        storage_ids = [
+            self.storage_ids[_.id]["offchainId"] for _ in join_tokens.pooled
+        ]
 
         url = self.endpoint + PATH.AMM_JOIN
 
@@ -1594,10 +1625,10 @@ class Client:
             "X-API-KEY": self.api_key
         }
         payload = clean_params({
-            "fee": fee if isinstance(fee, int) else fee.fee,
+            "fee": int(fee),
             "joinTokens": join_tokens.to_params(),
-            "owner": owner or self.address,
-            "poolAddress": pool if isinstance(pool, str) else pool.address,
+            "owner": self.address,
+            "poolAddress": str(pool),
             "storageIds": storage_ids,
             "validUntil": validate_timestamp(valid_until, "seconds", validate_future=True)
         })
@@ -1611,9 +1642,8 @@ class Client:
 
         message = generate_amm_pool_join_EIP712_hash(request.payload)
 
-        if not supplied_storage_ids:
-            self.offchain_ids[join_tokens.pooled[0].id] += 2
-            self.offchain_ids[join_tokens.pooled[1].id] += 2
+        self.storage_ids[join_tokens.pooled[0].id]["offchainId"] += 2
+        self.storage_ids[join_tokens.pooled[1].id]["offchainId"] += 2
 
         helper = MessageEDDSASign(private_key=self.private_key)
         payload["eddsaSignature"] = helper.sign(message)
@@ -1775,37 +1805,32 @@ class Client:
             return rate
 
     async def submit_internal_transfer(self,
-        *,
-        client_id: str=None,
-        ecdsa_key: str,
-        exchange: Union[str, Exchange]=None,
-        payer_id: int,
-        payer_address: str,
-        payee_id: int,
-        payee_address: str,
-        token: Token,
-        max_fee: Token,
-        storage_id: int=None,
-        valid_until: Union[int, datetime]=None,
-        valid_since: Union[int, datetime]=None,
-        counter_factual_info: CounterFactualInfo=None,
-        memo: str=None) -> Transfer:
+            *,
+            client_id: str=None,
+            ecdsa_key: str,
+            payer_id: int,
+            payer_address: str,
+            payee_id: int,
+            payee_address: str,
+            token: Token,
+            max_fee: Token,
+            valid_until: Union[int, datetime]=None,
+            counter_factual_info: CounterFactualInfo=None,
+            memo: str=None
+        ) -> Transfer:
         """Submit an internal transfer.
 
         Args:
             client_id (str): ... .
             counter_factual_info (:obj:`~loopring.order.CounterFactualInfo`): ... .
             ecdsa_key (str): Ethereum L1 private key.
-            exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): ... .
             max_fee (:obj:`~loopring.token.Token`): ... .
             memo (str): ... .
             payee_address (str): ... .
             payee_id (int): ... .
             payer_address (str): ... .
             payer_id (int): ... .
-            storage_id (int): ... .
             token (:obj:`~loopring.token.Token`): ... .
-            valid_since (Union[int, :class:`~datetime.datetime`]): ... .
             valid_until (Union[int, :class:`~datetime.datetime`]): ... .
 
         Returns:
@@ -1821,13 +1846,9 @@ class Client:
             UnsupportedFeeToken: ... .
 
         """
-
-        if isinstance(exchange, Exchange):
-            exchange = str(exchange)
         
-        if storage_id is None:
-            storage_id = self.offchain_ids[token.id]
-            self.offchain_ids[token.id] += 2
+        storage_id = self.storage_ids[token.id]["offchainId"]
+        self.storage_ids[token.id]["offchainId"] += 2
 
         if not valid_until:
             # Default to 2 months:
@@ -1841,7 +1862,7 @@ class Client:
         payload = clean_params({
             "clientId": client_id,
             "counterFactualInfo": counter_factual_info,
-            "exchange": exchange or str(self.exchange),
+            "exchange": str(self.exchange),
             "maxFee": max_fee.to_params(),
             "memo": memo,
             "payeeAddr": payee_address,
@@ -1892,17 +1913,14 @@ class Client:
 
     async def submit_offchain_withdrawal_request(self,
         *,
-        account_id: int=None,
         counter_factual_info: CounterFactualInfo=None,
         ecdsa_key: str,
-        exchange: Union[str, Exchange]=None,
         extra_data: bytes=b"",
         fast_withdrawal_mode: bool=None,
         hash_approved: str=None,
         owner: str,
         max_fee: Token,
         min_gas: int=0,
-        storage_id: int=None,
         to: str,
         token: Token,
         valid_since: Union[int, datetime]=None,
@@ -1916,9 +1934,8 @@ class Client:
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
         valid_since = int(datetime.timestamp(datetime.now()))
 
-        if storage_id is None:
-            storage_id = self.offchain_ids[token.id]
-            self.offchain_ids[token.id] += 2
+        storage_id = self.storage_ids[token.id]["offchainId"]
+        self.storage_ids[token.id]["offchainId"] += 2
 
         url = self.endpoint + PATH.USER_WITHDRAWALS
 
@@ -1929,9 +1946,9 @@ class Client:
         )
 
         payload = clean_params({
-            "accountId": account_id or self.account_id,
+            "accountId": self.account_id,
             "counterFactualInfo": counter_factual_info,
-            "exchange": exchange or str(self.exchange),
+            "exchange": str(self.exchange),
             "extraData": extra_data,
             "fastWithdrawalMode": fast_withdrawal_mode,
             "hashApproved": hash_approved,
@@ -1984,52 +2001,68 @@ class Client:
             return withdrawal
 
     async def submit_order(self,
-                        *,
-                        affiliate: str="66825",
-                        all_or_none: str=False,
-                        buy_token: Token,
-                        client_order_id: str=None,
-                        exchange: Union[str, Exchange]=None,
-                        fill_amount_b_or_s: bool,
-                        max_fee_bips: int,
-                        order_type: str=None,
-                        pool_address: str=None,
-                        sell_token: Token,
-                        taker: str=None,
-                        trade_channel: str=None,
-                        valid_since: Union[int, datetime]=None,
-                        valid_until: Union[int, datetime]=None
-                        ) -> PartialOrder:
+            side: _SIDE,
+            target: Token,
+            *,
+            affiliate: int=None,
+            client_order_id: str=None,
+            in_return_for: Token=None,
+            max_fee_bips: int,
+            order_type: str=None,
+            pool_address: Union[str, Pool, PoolSnapshot]=None,
+            taker: str=None,
+            trade_channel: str=None,
+            using: Token=None,
+            valid_until: Union[int, datetime]=None
+        ) -> PartialOrder:
         """Submit an order.
 
+        Place an order on loopring's market exchange.
+
+        Note:
+            Loopring doesn't support market price orders.
+
+        Examples:
+            The method for placing a buy order for 100 LRC @ 0.01 ETH/LRC is as
+            follows;
+
+            - Find the number of decimal places (``decimals``) to which a token can \
+                be expressed in their smallest unit.
+            - Multiply the quantity of tokens by 10 raised to the power of \
+                ``decimals`` to get the floating point value.
+            - Pass this into a dictionary, with the token's ID, and send it along \
+                in a request to the order submission endpoint.
+            
+            That can be a bit of a headache, so that's what this code is doing
+            behind the scenes:
+
+            .. code-block:: python3
+
+                # from loopring.util.helpers import fetch
+                lrc_cfg = fetch(client.tokens, symbol="LRC")
+                eth_cfg = fetch(client.tokens, symbol="ETH")
+
+                # from loopring import Token
+                LRC = Token.from_quantity(100, lrc_cfg)
+                ETH = Token.from_quantity(1, eth_cfg)
+
+                await client.submit_order("buy", token=LRC, with=ETH, ...)
+
         Args:
-            affiliate (str): An account ID to receive a share of the
-                order's fee. Don't supply this argument if you want to support
-                the project directly!
-            all_or_none (str): Whether the order supports partial fills
-                or not. Currently only supports `False`, no need to provide this arg.
-            buy_token (:obj:`~loopring.token.Token`): Wrapper object used \
-                to describe a token associated with a certain quantity.
-            client_order_id (str): An arbitrary, unique client-side
-                order ID.
-            exchange (Union[str, :obj:`~loopring.exchange.Exchange`]): The address of \
-                the exchange used to process this order.
-            fill_amount_b_or_s (bool): Fill the size by the `'BUY'` (True) or `'SELL'` (False) \
-                token.
-            max_fee_bips (int): Maximum order fee that the user can accept, \
+            affiliate: An account ID to receive a share of the order's fee.
+            client_order_id: An arbitrary, unique client-side order ID.
+            max_fee_bips: Maximum order fee that the user can accept, \
                 value range (in ten thousandths) 1 ~ 63.
-            order_type (str): The type of order: `'LIMIT_ORDER'`, `'AMM'`, \
+            order_type: The type of order: `'LIMIT_ORDER'`, `'AMM'`, \
                 `'MAKER_ONLY'`, `'TAKER_ONLY'`.
-            pool_address (str): The AMM Pool address if order type is `'AMM'`.
-            sell_token (:obj:`~loopring.token.Token`): Wrapper object used \
-                to describe a token associated with a certain quantity.
-            taker (str): Used by the P2P order, where the user needs to \
+            pool_address: The AMM Pool address if order type is `'AMM'`.
+            side: Determine whether to submit a '`BUY`' order or a '`SELL`' \
+                order.
+            taker: Used by the P2P order, where the user needs to \
                 specify the taker's address.
-            trade_channel (str): The channel to be used when ordering: \
+            trade_channel: The channel to be used when ordering: \
                 `'ORDER_BOOK'`, `'AMM_POOL'`, `'MIXED'`.
-            valid_since (Union[int, :class:`~datetime.datetime`): The order's init \
-                time, in seconds.
-            valid_until (Union[int, :class:`~datetime.datetime`): The order expiry \
+            valid_until: The order expiry \
                 time, in seconds.
 
         Returns:
@@ -2062,9 +2095,27 @@ class Client:
 
         """
 
-        if not (self.__exchange_domain_initialised or exchange):
-            raise InvalidArguments("Please initialise the exchange or provide one.")
-        
+        side = side.lower()
+
+        assert side in ["buy", "sell"]
+        assert not (in_return_for and using)  # Mutually exclusive
+
+        # Not happy with these conditionals, but I'll come
+        # back to it another day
+        if side == "sell" and in_return_for is None:
+            examples = "https://diggydev.co.uk/loopring/apireference.html#loopring.client.Client.submit_order"
+            raise InvalidArguments(
+                f"Missing 'in_return_for' argument. Refer to " +
+                f"the API Reference examples if you need help - {examples}"
+            )
+
+        elif side == "buy" and using is None:
+            examples = "https://diggydev.co.uk/loopring/apireference.html#loopring.client.Client.submit_order"
+            raise InvalidArguments(
+                f"Missing 'using' argument. Refer to " +
+                f"the API Reference examples if you need help - {examples}"
+            )
+
         if not valid_until:
             # Default to 2 months:
             # See 'https://docs.loopring.io/en/basics/orders.html#timestamps'
@@ -2072,10 +2123,15 @@ class Client:
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
         valid_since = int(datetime.timestamp(datetime.now()))
 
-        order_id = self.order_ids[sell_token.id]
+        side = True if side == "buy" else False
+
+        sell_token = in_return_for or target
+        buy_token = using or target
+
+        order_id = self.storage_ids[sell_token.id]["orderId"]
         assert order_id < IntSig.MAX_ORDER_ID
 
-        self.order_ids[sell_token.id] += 2
+        self.storage_ids[sell_token.id]["orderId"] += 2
 
         url = self.endpoint + PATH.ORDER
 
@@ -2090,8 +2146,8 @@ class Client:
 
             "buyToken": buy_token.to_params(),
             "clientOrderId": client_order_id,
-            "exchange": exchange or str(self.exchange),
-            "fillAmountBOrS": fill_amount_b_or_s,
+            "exchange": str(self.exchange),
+            "fillAmountBOrS": side,
             "maxFeeBips": max_fee_bips,
             "orderType": order_type,
             "poolAddress": pool_address,
