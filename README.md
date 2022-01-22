@@ -22,11 +22,11 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Load in client config/account export from a file instead of pasting it directly into a python script.
 - [x] Make some sense out of [how storage IDs work](https://github.com/Loopring/protocols/blob/master/packages/loopring_v3/DESIGN.md#storage).
 - [x] Finish off REST API endpoints.
+- [x] Make a helper for volume conversion.
+- [x] Make some util functions for accessing local storage objects.
 - [ ] Finish documentation for all the endpoints.
-- [ ] Make some util functions for accessing local storage objects.
 - [ ] Let client deal with all timezone/time difference related issues.
 - [ ] Look into turning prices into floats instead of strings.
-- [ ] Make a helper for volume conversion.
 - [ ] Make a `CONTRIBUTING.md`
 - [ ] Add a mapping for request types (query_order_fee())
 - [ ] Start and finish the websocket API.
@@ -35,6 +35,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [ ] Ratelimits exist, but information is scarce... Work on implementing async ratelimiting anyway!
 - [ ] Synchronous version of the wrapper?
 - [ ] Periodic token config updating, necessary for long-running clients.
+- [ ] Logging?
 
 ## Honourable mentions:
 
