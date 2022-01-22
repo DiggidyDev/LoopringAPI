@@ -191,7 +191,7 @@ class PoolSnapshot:
     pool_address: str
     pool_name: str
     pooled: List[Token]
-    risky: 100
+    risky: bool
 
     def __init__(self, **data):
         for k in data.keys():
