@@ -34,7 +34,8 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.coverage',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx_autodoc_typehints'
 ]
 
 intersphinx_mapping = {
@@ -69,3 +70,6 @@ html_static_path = ['_static']
 # If true, suppress the module name of the python reference if it can be
 # resolved. The default is False.
 python_use_unqualified_type_names = True
+
+
+always_document_param_types = True
