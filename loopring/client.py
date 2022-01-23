@@ -92,7 +92,7 @@ class Client:
     markets: Dict[str, Market] = {}
     pools: Dict[str, Pool] = {}
     storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
-    tokens: _TokenDict[int, TokenConfig] = _TokenDict()
+    tokens: _TokenDict = _TokenDict()
 
     def __init__(self,
             account_id: int=None,
@@ -2099,7 +2099,6 @@ class Client:
             behind the scenes:
 
             .. code-block:: python3
-
 
                 # from loopring.util.helpers import fetch
                 lrc_cfg = client.tokens["LRC"]
