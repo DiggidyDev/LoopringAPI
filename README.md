@@ -41,9 +41,5 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 
 A big, big thank you to the following people:
 
-- BanthaFupa: Helping to test the different endpoints!
-- Taranasus: His [LoopringSharp](https://github.com/taranasus/LoopringSharp) package gave me the little boost of motivation to get started on this API wrapper!
-
-## Like what you see?
-
-If you like what you see and want to support the development of this wrapper, it's as simple as just using it! Whenever you [place an order](https://diggydev.co.uk/loopring/apireference.html#loopring.client.Client.submit_order) (without changing the `affiliate` arg), it'll send a small share of the fees to me! <3
+- [Blaine Costello](https://github.com/blainecostello): Helping to test the different endpoints, and squash some bugs in the process!
+- [Taranasus](https://github.com/taranasus): His [LoopringSharp](https://github.com/taranasus/LoopringSharp) package gave me the little boost of motivation to get started on this API wrapper!
