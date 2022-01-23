@@ -2199,6 +2199,7 @@ class Client:
 
         side = True if side == "buy" else False
 
+        # Bug squashed by Blaine Costello: https://github.com/blainecostello
         buy_token = in_return_for or target
         sell_token = using or target
 

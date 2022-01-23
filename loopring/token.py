@@ -253,7 +253,7 @@ class Token:
     @classmethod
     def from_quantity(cls, quantity: float, cfg: TokenConfig) -> "Token":
 
-        # Bug squashed by BanthaFupa: https://github.com/blainecostello
+        # Bug squashed by Blaine Costello: https://github.com/blainecostello
         vol = int(quantity * 10 ** cfg.decimals)
         
         return cls(id=cfg.token_id, volume=vol)
