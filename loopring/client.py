@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import time
+import sys
 from asyncio.events import AbstractEventLoop
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
@@ -35,12 +36,27 @@ from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSAS
 # TODO: Maybe accept `Fee` as the type for `max_fee` args, instead of `Token`
 
 
-_BLOCK_TYPEHINT = Union[int, Literal["finalized", "confirmed"]]
-_INTERVALS_TYPEHINT = Literal[
-    "1min", "5min", "15min", "30min", "1hr", "2hr", "4hr", "12hr", "1d", "1w"
-]
-_KT_STORAGE = Literal["offchainId", "orderId"]
-_SIDE = Literal["buy", "sell"]
+if sys.version_info.major < 3 or sys.version_info.minor < 6:
+    print("This library only supports Python 3.6+")
+    exit()
+
+
+# Literals were introduced in py 3.8
+if sys.version_info.minor < 8:
+    _BLOCK_TYPEHINT = Union[int, str]
+    _INTERVALS_TYPEHINT = str
+    _KT_STORAGE = str
+    _SIDE = str
+else:
+
+    from typing import Literal
+
+    _BLOCK_TYPEHINT = Union[int, Literal["finalized", "confirmed"]]
+    _INTERVALS_TYPEHINT = Literal[
+        "1min", "5min", "15min", "30min", "1hr", "2hr", "4hr", "12hr", "1d", "1w"
+    ]
+    _KT_STORAGE = Literal["offchainId", "orderId"]
+    _SIDE = Literal["buy", "sell"]
 
 
 class _TokenDict(Dict):
