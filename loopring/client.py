@@ -4,7 +4,7 @@ import logging
 import time
 from asyncio.events import AbstractEventLoop
 from datetime import datetime
-from typing import Dict, List, Literal, Sequence, Tuple, Union
+from typing import Any, Dict, List, Literal, Sequence, Tuple, Union
 
 import aiohttp
 from py_eth_sig_utils.signing import v_r_s_to_signature
@@ -43,6 +43,20 @@ _KT_STORAGE = Literal["offchainId", "orderId"]
 _SIDE = Literal["buy", "sell"]
 
 
+class _TokenDict(Dict):
+    
+    __symbol_mapping: Dict[str, int] = {}
+
+    def __getitem__(self, __k: Union[int, str]) -> Any:
+        if isinstance(__k, str):
+            return super().__getitem__(self.__symbol_mapping[__k.upper()])
+
+        return super().__getitem__(__k)
+
+    def set_symbol_map(self, __sm: Dict[str, int]) -> None:
+        self.__symbol_mapping = __sm
+
+
 class Client:
     """The main class interacting with Loopring's API endpoints.
 
@@ -78,7 +92,7 @@ class Client:
     markets: Dict[str, Market] = {}
     pools: Dict[str, Pool] = {}
     storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
-    tokens: Dict[int, TokenConfig] = {}
+    tokens: _TokenDict[int, TokenConfig] = _TokenDict()
 
     def __init__(self,
             account_id: int=None,
@@ -1264,16 +1278,21 @@ class Client:
                 raise_errors_in(content)
 
             token_confs = []
+            token_id_symbol_map = {}
 
             for t in content:
                 token_config = TokenConfig(**t)
                 token_confs.append(token_config)
+
+                token_id_symbol_map[token_config.symbol.upper()] = token_config.token_id
 
                 self.tokens[token_config.token_id] = token_config
                 self.storage_ids[token_config.token_id] = {
                     "offchainId": 0,
                     "orderId": 1
                 }
+
+            self.tokens.set_symbol_map(token_id_symbol_map)
 
             logging.debug("Finished initialising token config...")
             
@@ -2046,10 +2065,20 @@ class Client:
         ) -> PartialOrder:
         """Submit an order.
 
-        Place an order on loopring's market exchange.
+        Place an order on loopring's market exchange.  This function has been
+        designed with the intention of reading naturally like a sentence.
+
+        When placing a buy order on the LRC-ETH market for example, the funds will
+        fill from the token you want to buy, in this case, LRC.  Alternatively,
+        you can submit a sell order on ETH-LRC, achieving the same result, but the
+        funds will instead start filling from ETH's side.
+
+        If ``order_type`` is '`AMM`', only '`sell`' orders are accepted, as per
+        `the order model docs \
+        <https://docs.loopring.io/en/basics/orders.html#uni-directional-order-model>`_.
 
         Note:
-            Loopring doesn't support market price orders.
+            Loopring's API doesn't natively support market price orders.
             
             See :meth:`~loopring.client.Client.get_next_storage_id()` for more
             information on storage IDs.
@@ -2073,8 +2102,8 @@ class Client:
 
 
                 # from loopring.util.helpers import fetch
-                lrc_cfg = fetch(client.tokens, symbol="LRC")
-                eth_cfg = fetch(client.tokens, symbol="ETH")
+                lrc_cfg = client.tokens["LRC"]
+                eth_cfg = client.tokens["ETH"]
 
                 # from loopring import Token
                 LRC = Token.from_quantity(100, lrc_cfg)
@@ -2142,6 +2171,9 @@ class Client:
         assert side in ["buy", "sell"]
         assert not (in_return_for and using)  # Mutually exclusive
 
+        if order_type.lower() == "amm":
+            assert side == "sell"
+
         # Not happy with these conditionals, but I'll come
         # back to it another day
         if side == "sell" and in_return_for is None:
@@ -2167,8 +2199,8 @@ class Client:
 
         side = True if side == "buy" else False
 
-        sell_token = in_return_for or target
-        buy_token = using or target
+        buy_token = in_return_for or target
+        sell_token = using or target
 
         order_id = self.storage_ids[sell_token.id]["orderId"]
         assert order_id < IntSig.MAX_ORDER_ID

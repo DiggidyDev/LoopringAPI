@@ -3,7 +3,7 @@ import json
 
 import loopring
 from loopring import Token
-from loopring.util import Endpoints, fetch
+from loopring.util import Endpoints
 
 
 with open("account.json", "r") as fp:
@@ -20,7 +20,7 @@ async def main():
     symbols = ["LRC", "ETH"]
 
     # Load the cached `TokenConfig` for each symbol above
-    configs = [fetch(client.tokens, symbol=s) for s in symbols]
+    configs = [client.tokens[s] for s in symbols]
 
     # Update the cached storage IDs for local handling
     await asyncio.gather(*[client.get_next_storage_id(token=tc) for tc in configs])
