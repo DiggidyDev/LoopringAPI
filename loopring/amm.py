@@ -115,7 +115,7 @@ class ExitPoolTokens:
     def to_params(self):
         params = {}
 
-        params["burned"] = self.__dict__["burned"].to_params()
+        params["burned"] = self.__dict__["burned"].volume
         params["unPooled"] = [t.to_params() for t in self.__dict__["unpooled"]]
 
         return params
