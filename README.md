@@ -1,3 +1,5 @@
+<img src="docs/Loopring.py.png" alt="LoopringAPI Logo" width="312">
+
 # LoopringAPI (Work in progress)
 
 An API Wrapper for Loopring, made with Python.
@@ -24,7 +26,10 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Finish off REST API endpoints.
 - [x] Make a helper for volume conversion.
 - [x] Make some util functions for accessing local storage objects.
+- [x] Add a changelog to the docs
+- [ ] Learn how LP tokens are calculated/volume is decided (esp. burn fees!)
 - [ ] Finish documentation for all the endpoints.
+- [ ] Add a terminology/glossary for the API? Any keywords/terms or definitions that people should know.
 - [ ] Let client deal with all timezone/time difference related issues.
 - [ ] Look into turning prices into floats instead of strings.
 - [ ] Make a `CONTRIBUTING.md`
