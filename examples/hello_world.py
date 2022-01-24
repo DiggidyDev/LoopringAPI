@@ -11,10 +11,11 @@ with open("account.json", "r") as fp:
 
 cfg["endpoint"] = Endpoints.MAINNET
 
-client = loopring.Client(handle_errors=True, config=cfg)
+client = loopring.Client(config=cfg)
+
 
 async def main():
-    
+
     # Get orders made in the past 8 days
     rt = await client.get_relayer_time()
     start = rt - timedelta(8)

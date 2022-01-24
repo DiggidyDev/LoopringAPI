@@ -11,7 +11,7 @@ with open("account.json", "r") as fp:
 
 cfg["endpoint"] = Endpoints.MAINNET
 
-client = loopring.Client(handle_errors=True, config=cfg)
+client = loopring.Client(config=cfg)
 
 
 async def main():
