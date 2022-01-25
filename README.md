@@ -1,4 +1,6 @@
-<img src="docs/Loopring.py.png" alt="LoopringAPI Logo" width="312">
+<p align="center" width="100%">
+    <img src="docs/Loopring.py.png" alt="LoopringAPI Logo" width="312">
+</p>
 
 # LoopringAPI (Work in progress)
 
