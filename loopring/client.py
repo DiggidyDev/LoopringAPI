@@ -63,7 +63,7 @@ class _TokenDict(Dict):
     
     __symbol_mapping: Dict[str, int] = {}
 
-    def __getitem__(self, __k: Union[int, str]) -> Any:
+    def __getitem__(self, __k: Union[int, str]) -> TokenConfig:
         if isinstance(__k, str):
             return super().__getitem__(self.__symbol_mapping[__k.upper()])
 
@@ -74,41 +74,75 @@ class _TokenDict(Dict):
 
 
 class Client:
-    """The main class interacting with Loopring's API endpoints.
+    """The class responsible for interacting with Loopring's REST API endpoints.
+
+    Please note that some of the client's methods have the possibility of raising some
+    error codes that in theory shouldn't be raised.  Instead of removing these, I've kept
+    true to the Official Documentation and made notes of all possible errors from each
+    endpoint.
+
+    In the future, these unnecessary errors may be removed from this documentation to
+    minimise any extraneous information.
+
+    Warning:
+        The following methods have yet to be thoroughly tested on the mainnet;\n
+        :meth:`~Client.exit_amm_pool()`\n
+        :meth:`~Client.join_amm_pool()`\n
+        :meth:`~Client.submit_internal_transfer()`\n
+        :meth:`~Client.submit_offchain_withdrawal_request()`\n
+        :meth:`~Client.update_account_eddsa_key()`\n
 
     .. _Examples: quickstart.html
 
     Args:
-        account_id (int): The ID of the account belonging to the API Key.
-        api_key (str): The API Key associated with your L2 account.
-        endpoint (:class:`~loopring.util.enums.Endpoints`): The API endpoint \
-            to interact with.
-        handle_errors (bool): Whether the client should raise any exceptions returned \
-            from API responses. `False` would mean the raw JSON response
+        account_id: The ID of your L2 account.
+        address: Your L1/ETH wallet address associated with your Loopring \
+            account.
+        api_key: The API Key associated with your L2 account.
+        endpoint: The API endpoint to interact with.
+        handle_errors: Whether the client should raise any exceptions returned \
+            from API responses. ``False`` would mean the raw JSON response
             would be returned, and no exception would be raised.
-        **config (dict): A dictionary-based version of the positional arguments. \
-            It may be preferred to use this method over positional arguments, as \
+        nonce: Your Loopring account's nonce.
+        private_key: The private key of your L2 wallet. KEEP THIS TO YOURSELF.
+        publicX: A component of the EdDSA public key.
+        publicY: A component of the EdDSA public key.
+        **config: A dictionary-based version of the positional arguments. It \
+            may be preferred to use this method over positional arguments, as \
             shown in the `Examples`_.
 
     """
 
     # Account annotations
     account_id: int
+    """The ID of your L2 account"""
     address: str
+    """Your L1/ETH wallet address associated with your Loopring account"""
     api_key: str
+    """The API Key associated with your L2 account"""
     nonce: int
+    """Your Loopring account's nonce"""
     private_key: str
+    """The private key of your L2 wallet. KEEP THIS TO YOURSELF!"""
     publicX: str
+    """A component of the EdDSA public key"""
     publicY: str
+    """A component of the EdDSA public key"""
 
     # misc.
     endpoint: ENDPOINT
+    """The endpoint to receive REST API Requests (testnet/mainnet)"""
     exchange: Exchange
+    """The exchange operating on the chosen endpoint"""
     handle_errors: bool
     markets: Dict[str, Market] = {}
+    """A mapping of all markets, accessible by their trading pair (e.g ``LRC-ETH``)"""
     pools: Dict[str, Pool] = {}
+    """A mapping of all AMM pools, accessible by their market symbol (e.g ``AMM-LRC-ETH``)"""
     storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
+    """A mapping of offchain storage IDs and order IDs"""
     tokens: _TokenDict = _TokenDict()
+    """A mapping of all supported tokens on Loopring's exchange, accessible by their ID or symbol"""
 
     def __init__(self,
             account_id: int=None,
@@ -123,15 +157,29 @@ class Client:
             publicY: str=None,
             **config
         ):
+        """Initialise the Loopring client.
+        
+        The final step of the client's initialisation is fetching all
+        configurations from the API concurrently (pools, tokens, markets)
+        and loading them into local storage.  This is done to allow fast
+        access to necessary data, as you ideally want your trading bot to be
+        as efficient as possible.
+
+        As previously mentioned, it would be a good idea to periodically
+        run the ``get_..._configurations()`` methods for longer running clients,
+        as over time there could be additions to supported tokens (and in
+        turn), markets and AMM pools.
+
+        """
         self.__exchange_domain_initialised = False
         self.__handle_errors = handle_errors
         
         cfg = config.get("config", {})
         
-        if not (cfg.get("account_id") or account_id):
+        if not (cfg.get("accountId") or account_id):
             raise InvalidArguments("Missing account ID from config.")
         
-        if not (cfg.get("api_key") or api_key):
+        if not (cfg.get("apiKey") or api_key):
             raise InvalidArguments("Missing API Key from config.")
         
         if not (cfg.get("endpoint") or endpoint):
@@ -140,7 +188,7 @@ class Client:
         if not (cfg.get("nonce") or endpoint):
             raise InvalidArguments("Missing nonce from config.")
         
-        if not (cfg.get("private_key") or private_key):
+        if not (cfg.get("privateKey") or private_key):
             raise InvalidArguments("Missing Private Key from config.")
 
         if not (cfg.get("publicX") or publicX):
@@ -149,12 +197,12 @@ class Client:
         if not (cfg.get("publicY") or publicY):
             raise InvalidArguments("Missing publicY from config.")
 
-        self.account_id  = cfg.get("account_id", account_id)
+        self.account_id  = cfg.get("accountId", account_id)
         self.address     = cfg.get("address", address)
-        self.api_key     = cfg.get("api_key", api_key)
+        self.api_key     = cfg.get("apiKey", api_key)
         self.endpoint    = cfg.get("endpoint", endpoint)
         self.nonce       = cfg.get("nonce", nonce)
-        self.private_key = cfg.get("private_key", private_key)
+        self.private_key = cfg.get("privateKey", private_key)
         self.publicX     = cfg.get("publicX", publicX)
         self.publicY     = cfg.get("publicY", publicY)
 
@@ -177,11 +225,11 @@ class Client:
 
         .. _documentation page: https://docs.loopring.io/en
 
-        If set to `False`, you will receive a :py:class:`dict` containing
+        If set to ``False``, you will receive a :py:class:`dict` containing
         the raw response from the API, which you will then need to deal with
         yourself. You'll be able to find the error codes from the respective
         `documentation page`_.  
-        However, if set to `True`, all errors will be handled for you and raised
+        However, if set to ``True``, all errors will be handled for you and raised
         where necessary from responses.
 
         .. seealso:: :class:`~loopring.util.mappings.Mappings.ERROR_MAPPINGS`
@@ -197,20 +245,19 @@ class Client:
             client_order_id: str=None,
             orderhash: str=None
         ) -> PartialOrder:
-        """Cancel a submitted order.
+        """Cancel a submitted order using a client-side order ID or an order hash.
 
-        The order hash can either be stored locally upon submission creation, or \
-            fetched with :meth:`~loopring.client.Client.get_multiple_orders()` using \
-            the `status` argument set to '`processing`'
+        The order hash can either be stored locally upon an order submission, or
+        fetched with :meth:`~loopring.client.Client.get_multiple_orders()` using
+        the ``status`` argument set to '`processing`'.
 
         Args:
-            client_order_id: A label to describe the order. This has no \
-                impact on trading.
+            client_order_id: A label to describe the order. This has no impact \
+                on trading.
             orderhash: The order hash of a submitted order response.
 
         Returns:
-            An object containing information about the cancelled order.  See \
-                :meth:`~loopring.client.Client.submit_order()`.
+            An object containing information about the cancelled order.
         
         Raises:
             EmptyAPIKey: No API Key was provided in the request header.
@@ -221,6 +268,8 @@ class Client:
             UnknownError: Something out of your control (probably) went wrong!
 
         """
+
+        assert client_order_id or orderhash
 
         url = self.endpoint + PATH.ORDER
         params = clean_params({
@@ -251,12 +300,15 @@ class Client:
 
             return order
 
+    # TODO: Maybe get rid of `.close()` and `.stop()` and
+    #       replace them with `.exit()`/`.logout()`?
     async def close(self) -> None:
         """Close the client's active connection session."""
 
         if not self._session.closed:
             await self._session.close()
 
+    # TODO: Example! AND UNDERSTAND LP TOKENS!
     async def exit_amm_pool(self,
             *,
             exit_tokens: ExitPoolTokens,
@@ -265,6 +317,28 @@ class Client:
             valid_until: Union[int, datetime]=None
         ) -> Transfer:
         """Exit an AMM pool.
+
+        Warning:
+            Unless you know what you're doing, don't attempt to use this
+            method until it's thoroughly documented with examples and 
+            explanations.
+
+        Examples:
+
+            TODO: Finish the example.
+
+            .. code-block:: python3
+
+                lrc_cfg = client.tokens["LRC"]
+                eth_cfg = client.tokens["ETH"]
+                lp_cfg = client.tokens["LP-LRC-ETH"]
+
+                LRC = Token.from_quantity(10, lrc_cfg)
+                ETH = Token.from_quantity(0.03, eth_cfg)
+                LP = Token.from_quantity(5, lp_cfg)
+
+                # AMM-LRC-ETH
+                exit_tokens = ExitPoolTokens.from_tokens(LRC, ETH, LP)
         
         Args:
             exit_tokens: The exit tokens with which to exit.  Bear in mind that the \
@@ -1121,13 +1195,14 @@ class Client:
 
     # TODO: Accept a list of str for status?
     async def get_password_reset_transactions(self,
-        *,
-        account_id: int=None,
-        end: Union[int, datetime]=None,
-        limit: int=None,
-        offset: int=None,
-        start: Union[int, datetime]=None,
-        status: str=None) -> List[TransactionHashData]:
+            *,
+            account_id: int=None,
+            end: Union[int, datetime]=None,
+            limit: int=None,
+            offset: int=None,
+            start: Union[int, datetime]=None,
+            status: str=None
+        ) -> List[TransactionHashData]:
         """Get eth transactions from a user from password resets on the exchange.
         
         Args:
@@ -1201,10 +1276,11 @@ class Client:
             return transactions
 
     async def get_recent_market_trades(self,
-        market: str="LRC-ETH",
-        *,
-        limit: int=20,
-        fill_types: str=None) -> List[Trade]:
+            market: str="LRC-ETH",
+            *,
+            limit: int=20,
+            fill_types: str=None
+        ) -> List[Trade]:
         """Get trades of a specific trading pair.
 
         Args:
@@ -1315,15 +1391,16 @@ class Client:
             return token_confs
 
     async def get_user_amm_join_exit_history(self,
-        *,
-        account_id: int=None,
-        amm_pool: Union[str,  Pool, PoolSnapshot],
-        end: Union[int, datetime]=None,
-        limit: int=None,
-        offset: int=None,
-        start: Union[int, datetime]=None,
-        tx_status: str=None,
-        tx_types: str=None) -> List[AMMTransaction]:
+            *,
+            account_id: int=None,
+            amm_pool: Union[str,  Pool, PoolSnapshot],
+            end: Union[int, datetime]=None,
+            limit: int=None,
+            offset: int=None,
+            start: Union[int, datetime]=None,
+            tx_status: str=None,
+            tx_types: str=None
+        ) -> List[AMMTransaction]:
         """Get a user's AMM join/exit history."""
 
         url = self.endpoint + PATH.AMM_USER_TRANSACTIONS
@@ -1358,15 +1435,16 @@ class Client:
             return transactions
 
     async def get_user_deposit_history(self,
-        *,
-        account_id: int=None,
-        end: Union[int, datetime]=None,
-        hashes: Union[str, Sequence[str]]=None,
-        limit: int=None,
-        offset: int=None,
-        start: Union[int, datetime]=None,
-        status: str=None,
-        token_symbol: str=None) -> List[DepositHashData]:
+            *,
+            account_id: int=None,
+            end: Union[int, datetime]=None,
+            hashes: Union[str, Sequence[str]]=None,
+            limit: int=None,
+            offset: int=None,
+            start: Union[int, datetime]=None,
+            status: str=None,
+            token_symbol: str=None
+        ) -> List[DepositHashData]:
         """Get a user's deposit records.
         
         Args:
@@ -1426,15 +1504,19 @@ class Client:
             return deposits
 
     async def get_user_exchange_balances(self,
-        *,
-        account_id: int=None,
-        tokens: Union[str, int, Sequence[Union[str, int, Token]]]="0,1"
+            *,
+            account_id: int=None,
+            tokens: Union[
+                str, int, Token, TokenConfig, Sequence[
+                    Union[str, int, Token, TokenConfig]
+                ]
+            ]="0,1"
         ) -> List[Balance]:
         """Get all eth and token balances on a user's exchange account.
 
         Args:
-            account_id (int): ... .
-            tokens (Union[str, int, Sequence[Union[str, int, Token]]]): ... .
+            account_id: ... .
+            tokens: ... .
 
         Returns:
             List[:obj:`~loopring.account.Balance`]: ... .
@@ -1456,20 +1538,29 @@ class Client:
             tokens = []
 
             for t in old:
-                if isinstance(t, Token):
-                    tokens.append(t.id)
-                elif isinstance(t, (int, str)):
+                if isinstance(t, (Token, TokenConfig)):
+                    tokens.append(int(id))
+                elif isinstance(t, int):
                     tokens.append(t)
+                elif isinstance(t, str):
+                    # TODO: Add default value for `.get(..., _)` _ maybe "eth"?
+                    tokens.append(int(self.tokens[t]))
 
             # Ensure all `_` are strings
             tokens = ",".join([f"{_}" for _ in tokens])
+
+        elif isinstance(tokens, str):
+            tokens = int(self.tokens[tokens])
 
         headers = {
             "X-API-KEY": self.api_key
         }
         params = clean_params({
             "accountId": account_id or self.account_id,
-            "tokens": tokens
+
+            # The only possible type left would be `Token` or `TokenConfig`,
+            # hence `int(tokens)`
+            "tokens": tokens if isinstance(tokens, str) else int(tokens)
         })
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -1668,7 +1759,14 @@ class Client:
             pool: Union[str, Pool],
             valid_until: Union[int, datetime]=None
         ) -> Transfer:
-        """Join an AMM Pool."""
+        """Join an AMM Pool.
+
+        Warning:
+            Unless you know what you're doing, don't attempt to use this
+            method until it's thoroughly documented with examples and 
+            explanations.
+        
+        """
 
         if valid_until is None:
             valid_until = int(time.time()) + 60 * 60 * 24 * 60
@@ -1884,6 +1982,11 @@ class Client:
         ) -> Transfer:
         """Submit an internal transfer.
 
+        Warning:
+            Unless you know what you're doing, don't attempt to use this
+            method until it's thoroughly documented with examples and 
+            explanations.
+
         Args:
             client_id (str): ... .
             counter_factual_info (:obj:`~loopring.order.CounterFactualInfo`): ... .
@@ -1989,7 +2092,14 @@ class Client:
         token: Token,
         valid_since: Union[int, datetime]=None,
         valid_until: Union[int, datetime]=None) -> PartialOrder:
-        """Submit an offchain withdrawal request."""
+        """Submit an offchain withdrawal request.
+
+        Warning:
+            Unless you know what you're doing, don't attempt to use this
+            method until it's thoroughly documented with examples and 
+            explanations.
+        
+        """
 
         if not valid_until:
             # Default to 2 months:
@@ -2098,6 +2208,9 @@ class Client:
             
             See :meth:`~loopring.client.Client.get_next_storage_id()` for more
             information on storage IDs.
+
+            See `here <https://diggydev.co.uk/loopring/quickstart.html#sell-example-py>`_
+            for an example of a sell order.
 
         Examples:
             The method for placing a buy order for 100 LRC @ 0.01 ETH/LRC is as
@@ -2339,7 +2452,14 @@ class Client:
         max_fee: Token,
         owner: str=None,
         valid_until: Union[int, datetime]=None) -> ...:
-        """Update the EdDSA key associated with an account."""
+        """Update the EdDSA key associated with an account.
+
+        Warning:
+            Unless you know what you're doing, don't attempt to use this
+            method until it's thoroughly documented with examples and 
+            explanations.
+        
+        """
 
         url = self.endpoint + PATH.ACCOUNT
 
