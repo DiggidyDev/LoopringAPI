@@ -14,7 +14,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 # PROGRESS: 38/38 REST API Endpoints done!
 
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
-- I have yet to start on the websocket API!
+- ~~I have yet to start on the WebSocket API!~~ I've started working on the WS API, but won't be pushing any of it until the REST API is fully documented.
 
 # [API Reference](https://diggydev.co.uk/loopring/index.html) being updated almost daily!
 
