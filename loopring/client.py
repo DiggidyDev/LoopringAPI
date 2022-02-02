@@ -179,6 +179,9 @@ class Client:
         if not (cfg.get("accountId") or account_id):
             raise InvalidArguments("Missing account ID from config.")
         
+        if not (cfg.get("address") or address):
+            raise InvalidArguments("Missing address from config.")
+        
         if not (cfg.get("apiKey") or api_key):
             raise InvalidArguments("Missing API Key from config.")
         
@@ -335,15 +338,20 @@ class Client:
 
                 LRC = Token.from_quantity(10, lrc_cfg)
                 ETH = Token.from_quantity(0.03, eth_cfg)
+
+                # The maximum LP volume to be burnt
                 LP = Token.from_quantity(5, lp_cfg)
 
                 # AMM-LRC-ETH
                 exit_tokens = ExitPoolTokens.from_tokens(LRC, ETH, LP)
+
+                await client.exit_amm_pool(exit_tokens, )
         
         Args:
             exit_tokens: The exit tokens with which to exit.  Bear in mind that the \
                 order of the `unpooled` tokens does matter.
-            max_fee: ... .
+            max_fee: The maximum fee of the AMM exit action - uses the quote token \
+                by default. For example, in ``LP-LRC-ETH``, ``ETH`` would be burnt.
             pool: The AMM pool you wish to exit.
             valid_until: A UNIX timestamp or datetime object representing the time \
                 of expiry for the submitted order.  Please note that your order may \
@@ -483,9 +491,15 @@ class Client:
     async def get_amm_pool_configurations(self) -> List[Pool]:
         """Get all AMM Pool configurations.
 
-        This function only needs to be called once, as the pools are stored in
-        local storage.  For longer-running clients, it is recommended to
-        periodically call this function to keep local storage pools up to date.
+        This method is called once during client initialisation in order to load
+        all pools into the client's cache.  This is done to avoid any unnecessary
+        API calls later on in your application's lifetime.  This will drastically
+        improve the speed of your application.
+
+        For longer running clients, it's generally a good idea to periodically
+        call the initialisation methods individually in order to keep all
+        information up to date.  This method is the only exception to that rule
+        of periodic updates.
 
         Returns:
             A list containing all pools supported on the Loopring exchange.
@@ -1825,7 +1839,7 @@ class Client:
         amount: str=None,
         request_type: int=1,
         token_symbol: str="LRC") -> Tuple[str, List[Fee]]:
-        """Return a fee amount.
+        """Return a fee amount for a request type.
 
         Args:
             account_id (int): ...
@@ -1917,15 +1931,17 @@ class Client:
 
     async def query_order_rates(self,
         *,
-        account_id: int=None,
-        market: str="LRC-ETH",
+        markets: Union[str, Market, Sequence[Union[str, Market]]]="LRC-ETH",
         token: Token) -> Rate:
-        """Query an order fee on a market for a given token and volume.
+        """Query an order fee for a market (or markets) for a given token and volume.
+
+        When querying against multiple markets, the supplied ``token`` must be common
+        to all markets, otherwise you will receive an ``Invalid market`` error
+        response.
 
         Args:
-            account_id (int): ... .
-            market (str): Defaults to '`LRC-ETH`'.
-            token (:obj:`~loopring.token.Token`): ... .
+            markets: Defaults to '`LRC-ETH`'.
+            token: The token of which to be getting the gas price when traded.
 
         Returns:
             :obj:`~loopring.token.Fee`: ...
@@ -1935,16 +1951,19 @@ class Client:
 
         """
 
+        if isinstance(markets, (list, tuple)):
+            markets = [str(m) for m in markets]
+
         url = self.endpoint + PATH.USER_ORDER_FEE
 
         headers = {
             "X-API-KEY": self.api_key
         }
         params = {
-            "accountId": account_id or self.account_id,
+            "accountId": self.account_id,
             "amountB": token.volume,
-            "market": market,
-            "tokenB": token.id
+            "market": markets,
+            "tokenB": int(token)
         }
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -2446,7 +2465,6 @@ class Client:
 
     async def update_account_eddsa_key(self,
         *,
-        account_id: int=None,
         ecdsa_key: str,
         exchange: Union[str, Exchange]=None,
         max_fee: Token,
@@ -2468,7 +2486,7 @@ class Client:
             valid_until = datetime.fromtimestamp(ts)
 
         payload = {
-            "accountId": account_id or self.account_id,
+            "accountId": self.account_id,
             "exchange": exchange or str(self.exchange),
             "maxFee": max_fee.to_params(),
             "nonce": self.nonce,
