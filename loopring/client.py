@@ -65,6 +65,13 @@ else:
     _SIDE = Literal["buy", "sell"]
 
 
+class _PoolDict(Dict):
+    """A subclassed dictionary, for case-insensitive keys"""
+
+    def __getitem__(self, __k: Union[str, PoolSnapshot]) -> Pool:
+        return super().__getitem__(str(__k).upper())
+
+
 class _TokenDict(Dict):
     
     __symbol_mapping: Dict[str, int] = {}
@@ -143,7 +150,7 @@ class Client:
     handle_errors: bool
     markets: Dict[str, Market] = {}
     """A mapping of all markets, accessible by their trading pair (e.g ``LRC-ETH``)"""
-    pools: Dict[str, Pool] = {}
+    pools: _PoolDict = _PoolDict()
     """A mapping of all AMM pools, accessible by their market symbol (e.g ``AMM-LRC-ETH``)"""
     storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
     """A mapping of offchain storage IDs and order IDs"""
@@ -508,7 +515,7 @@ class Client:
                 )
                 pools.append(pool)
 
-                self.pools[pool.market] = pool
+                self.pools[pool.market.upper()] = pool
 
             logging.debug("Finished initialising pool config...")
 
