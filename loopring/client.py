@@ -18,6 +18,7 @@ from .exchange import Block, DepositHashData, Exchange, TransactionHashData, Tra
 from .market import Candlestick, Market, Ticker, Trade
 from .order import CounterFactualInfo, Order, OrderBook, PartialOrder, Transfer
 from .token import Fee, Price, Rate, RateInfo, Token, TokenConfig
+from .util import Mappings
 from .util.enums import Endpoints as ENDPOINT
 from .util.enums import IntSig
 from .util.enums import Paths as PATH
@@ -35,6 +36,9 @@ from .util.sdk.sig.eddsa import MessageEDDSASign, OrderEDDSASign, TransferEDDSAS
 
 # TODO: Maybe accept `Fee` as the type for `max_fee` args, instead of `Token`
 
+# TODO: List the initialisation methods and explain which ones need to be
+#       periodically updated, and which ones don't
+
 
 if sys.version_info.major < 3 or sys.version_info.minor < 6:
     print("This library only supports Python 3.6+")
@@ -44,6 +48,7 @@ if sys.version_info.major < 3 or sys.version_info.minor < 6:
 # Literals were introduced in py 3.8
 if sys.version_info.minor < 8:
     _BLOCK_TYPEHINT = Union[int, str]
+    _CURRENCIES = str
     _INTERVALS_TYPEHINT = str
     _KT_STORAGE = str
     _SIDE = str
@@ -52,6 +57,7 @@ else:
     from typing import Literal
 
     _BLOCK_TYPEHINT = Union[int, Literal["finalized", "confirmed"]]
+    _CURRENCIES = Literal["CNY", "EUR", "GBP", "HKD", "JPY", "USD"]
     _INTERVALS_TYPEHINT = Literal[
         "1min", "5min", "15min", "30min", "1hr", "2hr", "4hr", "12hr", "1d", "1w"
     ]
@@ -117,7 +123,7 @@ class Client:
     account_id: int
     """The ID of your L2 account"""
     address: str
-    """Your L1/ETH wallet address associated with your Loopring account"""
+    """The L1/ETH wallet address associated with your Loopring account"""
     api_key: str
     """The API Key associated with your L2 account"""
     nonce: int
@@ -418,12 +424,13 @@ class Client:
             transfer = Transfer(**content)
             return transfer
 
-    async def get_account_info(self, address: str) -> Account:
+    async def get_account_info(self, address: str=None) -> Account:
         """Returns data associated with the user's exchange account.
         
         Args:
             address: The ethereum address belonging to the account of which you \
-                want information from.
+                want information from.  Note that ENSes are not supported.  Leave \
+                this parameter blank and it will default to your own address.
         
         Returns:
             An account containing all publicly available information.
@@ -438,7 +445,7 @@ class Client:
         url = self.endpoint + PATH.ACCOUNT
 
         params = {
-            "owner": address
+            "owner": address or self.address
         }
 
         async with self._session.get(url, params=params) as r:
@@ -453,41 +460,6 @@ class Client:
 
             return account
 
-    async def get_amm_pool_balance(self, pool: Union[str, Pool]) -> PoolSnapshot:
-        """Get an AMM Pool's balance.
-        
-        Args:
-            pool: The pool whose balance you want to query.
-        
-        Returns:
-            A pool snapshot containing LP token information and general pool data.
-        
-        Raises:
-            UnknownError: Something out of your control went wrong.
-        
-        """
-
-        url = self.endpoint + PATH.AMM_BALANCE
-
-        headers = {
-            "X-API-KEY": self.api_key
-        }
-        params = clean_params({
-            "poolAddress": str(pool)
-        })
-
-        async with self._session.get(url, headers=headers, params=params) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-            
-            ps = PoolSnapshot(**content)
-
-            return ps
-
     async def get_amm_pool_configurations(self) -> List[Pool]:
         """Get all AMM Pool configurations.
 
@@ -498,8 +470,10 @@ class Client:
 
         For longer running clients, it's generally a good idea to periodically
         call the initialisation methods individually in order to keep all
-        information up to date.  This method is the only exception to that rule
-        of periodic updates.
+        information up to date.
+
+        Note:
+            This method is called during client initialisation.
 
         Returns:
             A list containing all pools supported on the Loopring exchange.
@@ -594,12 +568,72 @@ class Client:
             
             return trades
 
+    async def get_amm_pool_snapshot(self, pool: Union[str, Pool]) -> PoolSnapshot:
+        """Get a snapshot of an AMM Pool.
+
+        The snapshot contains information such as the pool's address, liquidity
+        pool token (ID and Volume), name, pooled tokens, and a risk factor.
+        
+        Note:
+            As of now, it's not entirely known what ``risky`` means.  Please make a
+            PR or raise an issue if you're able to give some insight into it.
+
+        Examples:
+
+            .. code-block:: python3
+
+                amm_pool = client.pools["amm-lrc-usdc"]
+                snapshot = await client.get_amm_pool_snapshot(amm_pool)
+                
+                # Get the LP token's config information from the cache
+                lp_cfg = client.tokens[snapshot.lp.id]
+
+                lp_vol = snapshot.lp.volume  # '110817727700000'
+
+                # Human-friendly, floating-point volume
+                vol = volume_fp(lp_vol, lp_cfg)  # 1108177.277
+
+                # Display it in a readable format
+                print(f"{vol:,}")  # '1,108,177.277'
+        
+        Args:
+            pool: The pool, or pool's address, whose balance you want to query.
+        
+        Returns:
+            A pool snapshot containing LP token information and general pool data.
+        
+        Raises:
+            UnknownError: Something out of your control went wrong.
+        
+        """
+
+        url = self.endpoint + PATH.AMM_BALANCE
+
+        headers = {
+            "X-API-KEY": self.api_key
+        }
+        params = clean_params({
+            "poolAddress": str(pool)
+        })
+
+        async with self._session.get(url, headers=headers, params=params) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+            
+            ps = PoolSnapshot(**content)
+
+            return ps
+
     # TODO: Remove unnecessary error codes?
     async def get_api_key(self) -> str:
         """Get the API Key associated with the account.
 
         Your L2 wallet private key must be supplied in the client config in order
-        for the API's authentication to succeed.
+        for the API's signature authentication to succeed.
 
         Returns:
             str: The API Key associated with the account ID.
@@ -646,7 +680,16 @@ class Client:
             return content["apiKey"]
 
     async def get_block(self, *, id_or_status: _BLOCK_TYPEHINT="confirmed") -> Block:
-        """Get a layer 2 block by ID or status.
+        """Get a layer 2 block by its ID or status.
+
+        If you get a block by its status, only the most recent block of that status
+        will be returned.  If you wish to search for an earlier block, you'll need
+        to know its ID.
+
+        Note:
+            The ``tx_hash`` property occasionally won't be present when looking for
+            a '`confirmed`' block.  If a '`confirmed`' block isn't found, an
+            ``InvalidBlock`` error will be raised.
         
         Args:
             id_or_status: Any of the following values are accepted; '`finalized`', \
@@ -656,6 +699,7 @@ class Client:
             A layer 2 block, with a list of transactions (txs) belonging to it.
         
         Raises:
+            InvalidBlock: The block you're looking for doesn't exist.
             UnknownError: Something out of your control went wrong.
         
         """
@@ -666,7 +710,7 @@ class Client:
             "X-API-KEY": self.api_key
         }
         params = clean_params({
-            "id": str(id_or_status)
+            "id": str(id_or_status).lower()
         })
 
         async with self._session.get(url, headers=headers, params=params) as r:
@@ -683,6 +727,13 @@ class Client:
 
     async def get_exchange_configurations(self) -> Exchange:
         """Get configurations of loopring's exchange.
+
+        You won't need to explicitly call this at any point, as this will remain
+        constant throughout the lifetime of your client, due to it being tied to the
+        endpoint being used.
+
+        Note:
+            This is called during your client's initialisation.
 
         Returns:
             The exchange configuration for the currently connected endpoint.
@@ -720,19 +771,18 @@ class Client:
 
             return exchange
 
-    async def get_fiat_prices(self, currency: str="USD") -> List[Price]:
+    async def get_fiat_prices(self, currency: _CURRENCIES="USD") -> List[Price]:
         """Fetches fiat prices for all tokens supported on Loopring.
 
         Note:
-            Check the `updated_at` property of the returned prices, as they could be
-            out of sync by a couple of days.
+            Check the ``updated_at`` property of the returned prices, as they could \
+            be out of sync with the current time.
 
         Args:
-            currency (str): All supported values: "`USD`", "`CNY`", "`JPY`", 
-                "`EUR`", "`GBP`", "`HKD`". Defaults to "`USD`".
+            currency: Defaults to "`USD`".
         
         Returns:
-            All prices of supported tokens, in the given `currency`.
+            All prices of supported tokens, in the given ``currency``.
 
         Raises:
             UnknownError: Something went wrong out of your control.
@@ -768,7 +818,11 @@ class Client:
             limit: int=None,
             start: Union[int, datetime]=None
         ) -> List[Candlestick]:
-        """Get candlestick data for a given `market` (trading pair).
+        """Get candlestick data for a given ``market``, or trading pair.
+
+        Note:
+            Contrary to some other methods, this method only supports a single
+            market's trading pair (i.e. "`LRC-ETH,LRC-USDC,...`" isn't allowed).
 
         Args:
             market: Defaults to "`LRC-ETH`".  See all possible trading pairs in \
@@ -821,6 +875,9 @@ class Client:
     async def get_market_configurations(self) -> List[Market]:
         """Get all markets (trading pairs) on the exchange, both valid and invalid.
         
+        Note:
+            This is called during your client's initialisation.
+
         Returns:
             All markets listed on the exchange.
         
@@ -859,15 +916,15 @@ class Client:
             depth: int=2,
             limit: int=50
         ) -> OrderBook:
-        """Get the orderbook of a specific market (trading pair).
+        """Get the orderbook of a specific ``market``, trading pair.
 
         Args:
             limit: The maximum number of orders (bids/asks combined) to receive.  \
-                Defaults to 50.
-            market: The `market` (trading pair) whose orderbook you want to receive.  \
-                Defaults to 'LRC-ETH'.
+                Defaults to ``50``.
+            market: The ``market``, or trading pair, whose orderbook you want to \
+                receive.  Defaults to '`LRC-ETH`'.
             depth: The order book's aggregation level - the larger, the larger the \
-                depth will be.  Defaults to 2.
+                depth will be.  Defaults to ``2``.
         
         Returns:
             An orderbook containing bids and asks.
@@ -900,15 +957,19 @@ class Client:
             return orderbook
 
     async def get_market_ticker(self,
-            market: Union[str, Market, List[Market]]="LRC-ETH"
+            market: Union[str, Market, List[Union[str, Market]]]="LRC-ETH"
         ) -> List[Ticker]:
         """Get a ticker for a specific market or multiple markets.
 
+        A ticker's information consists of any data taken over the past 24 hours.
+        For example, the ``highest_price`` will be the highest price in the past
+        24 hours.
+
         Args:
             market: A market, or multiple markets, whose ticker(s) you want to \
-                receive.  If passing multiple trading pairs as a string, you may \
-                separate with commas;
-                `"LRC-ETH,LINK-ETH,HEX-ETH"`
+                receive.  If passing multiple trading pairs as a string, you must \
+                separate each pair with a comma (e.g '`LRC-ETH,LINK-ETH,HEX-ETH`'). \
+                Defaults to '`LRC-ETH`'.
 
         Returns:
             A list of tickers, matching the order of supplied markets if multiple 
@@ -948,7 +1009,7 @@ class Client:
     async def get_multiple_orders(self, *,
             end: Union[int, datetime]=None,
             limit: int=50,
-            market: Union[str, Market]=None,
+            market: Union[str, Market, List[Union[str, Market]]]=None,
             offset: int=0,
             order_types: str=None,
             side: str=None,
@@ -992,6 +1053,9 @@ class Client:
 
         """
 
+        if isinstance(market, list):
+            market = ",".join([str(m) for m in market])
+
         url = self.endpoint + PATH.ORDERS
         headers = {
             "X-API-KEY": self.api_key
@@ -1000,7 +1064,7 @@ class Client:
             "accountId": self.account_id,
             "end": validate_timestamp(end),
             "limit": limit,
-            "market": market,
+            "market": str(market),
             "offset": offset,
             "orderTypes": order_types,
             "side": side,
@@ -1024,6 +1088,7 @@ class Client:
 
             return orders
 
+    # TODO: Remove `fetch()` from example?
     async def get_next_storage_id(self,
             *,
             max_next: int=None,
@@ -1563,7 +1628,7 @@ class Client:
             # Ensure all `_` are strings
             tokens = ",".join([f"{_}" for _ in tokens])
 
-        elif isinstance(tokens, str):
+        elif isinstance(tokens, str) and "," not in tokens:
             tokens = int(self.tokens[tokens])
 
         headers = {
@@ -2098,19 +2163,20 @@ class Client:
             return Transfer(**content)
 
     async def submit_offchain_withdrawal_request(self,
-        *,
-        counter_factual_info: CounterFactualInfo=None,
-        ecdsa_key: str,
-        extra_data: bytes=b"",
-        fast_withdrawal_mode: bool=None,
-        hash_approved: str=None,
-        owner: str,
-        max_fee: Token,
-        min_gas: int=0,
-        to: str,
-        token: Token,
-        valid_since: Union[int, datetime]=None,
-        valid_until: Union[int, datetime]=None) -> PartialOrder:
+            *,
+            counter_factual_info: CounterFactualInfo=None,
+            ecdsa_key: str,
+            extra_data: bytes=b"",
+            fast_withdrawal_mode: bool=None,
+            hash_approved: str=None,
+            owner: str,
+            max_fee: Token,
+            min_gas: int=0,
+            to: str,
+            token: Token,
+            valid_since: Union[int, datetime]=None,
+            valid_until: Union[int, datetime]=None
+        ) -> PartialOrder:
         """Submit an offchain withdrawal request.
 
         Warning:
@@ -2248,7 +2314,7 @@ class Client:
 
             .. code-block:: python3
 
-                # from loopring.util.helpers import fetch
+                # from loopring.util import fetch
                 lrc_cfg = client.tokens["LRC"]
                 eth_cfg = client.tokens["ETH"]
 
@@ -2409,67 +2475,14 @@ class Client:
 
             return order
 
-    # TODO: rename to `regenerate_api_key()`?
-    async def update_api_key(self) -> str:
-        """Update the account's API Key.
-        
-        Returns:
-            str: Your account's new API Key.
-        
-        Raises:
-            EmptyAPIKey: ...
-            EmptySignature: ...
-            InvalidAccountID: ...
-            InvalidAPIKey: ...
-            InvalidArguments: ...
-            InvalidSignature: ...
-            UnknownError: ...
-            UserNotFound: ...
-
-        """
-
-        payload = {
-            "accountId": self.account_id
-        }
-
-        request = Request(
-            "post",
-            self.endpoint,
-            PATH.API_KEY,
-            payload=payload
-        )
-
-        helper = UrlEDDSASign(private_key=self.private_key)
-        x_api_sig = helper.sign(request)
-
-        headers = {
-            "X-API-KEY": self.api_key,
-            "X-API-SIG": x_api_sig
-        }
-
-        url = self.endpoint + PATH.API_KEY
-
-        # Use `json=` for POST, and `params=` for GET
-        async with self._session.post(url, headers=headers, json=payload) as r:
-            raw_content = await r.read()
-
-            content: dict = json.loads(raw_content.decode())
-
-            if self.handle_errors:
-                raise_errors_in(content)
-
-            new_api_key = content["apiKey"]
-            self.api_key = new_api_key
-
-            return self.api_key
-
     async def update_account_eddsa_key(self,
-        *,
-        ecdsa_key: str,
-        exchange: Union[str, Exchange]=None,
-        max_fee: Token,
-        owner: str=None,
-        valid_until: Union[int, datetime]=None) -> ...:
+            *,
+            ecdsa_key: str,
+            exchange: Union[str, Exchange]=None,
+            max_fee: Token,
+            owner: str=None,
+            valid_until: Union[int, datetime]=None
+        ) -> ...:
         """Update the EdDSA key associated with an account.
 
         Warning:
@@ -2528,3 +2541,57 @@ class Client:
                 raise_errors_in(content)
             
             return content
+
+    # TODO: rename to `regenerate_api_key()`?
+    async def update_api_key(self) -> str:
+        """Update the account's API Key.
+        
+        Returns:
+            str: Your account's new API Key.
+        
+        Raises:
+            EmptyAPIKey: ...
+            EmptySignature: ...
+            InvalidAccountID: ...
+            InvalidAPIKey: ...
+            InvalidArguments: ...
+            InvalidSignature: ...
+            UnknownError: ...
+            UserNotFound: ...
+
+        """
+
+        payload = {
+            "accountId": self.account_id
+        }
+
+        request = Request(
+            "post",
+            self.endpoint,
+            PATH.API_KEY,
+            payload=payload
+        )
+
+        helper = UrlEDDSASign(private_key=self.private_key)
+        x_api_sig = helper.sign(request)
+
+        headers = {
+            "X-API-KEY": self.api_key,
+            "X-API-SIG": x_api_sig
+        }
+
+        url = self.endpoint + PATH.API_KEY
+
+        # Use `json=` for POST, and `params=` for GET
+        async with self._session.post(url, headers=headers, json=payload) as r:
+            raw_content = await r.read()
+
+            content: dict = json.loads(raw_content.decode())
+
+            if self.handle_errors:
+                raise_errors_in(content)
+
+            new_api_key = content["apiKey"]
+            self.api_key = new_api_key
+
+            return self.api_key
