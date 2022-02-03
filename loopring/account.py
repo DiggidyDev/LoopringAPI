@@ -1,4 +1,4 @@
-from .util.helpers import auto_repr, to_snake_case
+from .util import auto_repr, to_snake_case
 
 
 class Account:

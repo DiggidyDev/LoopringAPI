@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from .util.helpers import auto_repr, to_snake_case
+from .util import auto_repr, to_snake_case
 from .util.mappings import Mappings
 
 
