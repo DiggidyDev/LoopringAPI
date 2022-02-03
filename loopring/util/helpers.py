@@ -160,9 +160,9 @@ def to_snake_case(camel: str) -> str:
 
 
 def validate_timestamp(
-    timestamp: Union[int, datetime],
-    unit: str="ms",
-    validate_future: bool=False
+        timestamp: Union[int, datetime],
+        unit: str="ms",
+        validate_future: bool=False
     ) -> int:
     """Validate whether the given time will be suitable for the API.
     
@@ -219,4 +219,11 @@ def validate_timestamp(
         raise TypeError(
             f"Invalid type. Expected 'int' or 'datetime.datetime', got '{type(timestamp)}'."
         )
+
+
+# TODO: Fix circular import for `TokenConfig` :p
+def volume_fp(volume: str, cfg) -> float:
+    """Convert a normalised volume to floating point."""
+
+    return int(volume) * 10**-(cfg.decimals)
 
