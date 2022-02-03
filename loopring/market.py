@@ -116,16 +116,17 @@ class Trade:
         block_id=None,
         block_num=None):
         self.action = action
-        self.block_id = int(block_id)
-        self.block_num = int(block_num)
+        self.block_id = int(block_id) if block_id else block_id
+        self.block_num = int(block_num) if block_num else block_num
         self.fees = fees
         self.market = market
         self.price = price
         self.record_id = record_id
         self.trade_time = datetime.fromtimestamp(int(trade_time) / 1000)
-        self.volume = int(volume)
+        self.volume = volume
 
     def __repr__(self) -> str:
+        block_info = ""
         if self.block_id is not None:
             block_info = f" block_id={self.block_id} block_num={self.block_num}"
         return f"<action='{self.action.title()}' market='{self.market}' " + \
@@ -135,7 +136,7 @@ class Trade:
     
     def __str__(self) -> str:
         # Add volume
-        return f"{self.action.title()} {self.market} @ {self.price}"  
+        return f"{self.action.title()} {self.market} @ {self.price} @ {self.trade_time}"  
 
 
 class Candlestick:
