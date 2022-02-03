@@ -22,7 +22,7 @@ copyright = '2022, Diggy'
 author = 'Diggy'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1a'
+release = '0.0.3a'
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,6 +32,7 @@ release = '0.0.1a'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.coverage',
     'sphinx.ext.intersphinx',
     'sphinx.ext.napoleon',
