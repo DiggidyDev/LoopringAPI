@@ -222,7 +222,7 @@ class TokenConfig:
         return auto_repr(self)
     
     def __str__(self) -> str:
-        return f"{self.name} ({self.symbol})"
+        return self.symbol
 
 
 class Token:
