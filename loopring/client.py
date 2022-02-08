@@ -97,32 +97,42 @@ class Client:
     In the future, these unnecessary errors may be removed from this documentation to
     minimise any extraneous information.
 
+    Note:
+        If you provide any timestamps in the client's methods, make sure they're in
+        UNIX form.  In any methods with a ``validUntil`` argument, the UNIX timestamp
+        should be supplied in `seconds` (10 digits long), otherwise it should be
+        supplied in `milliseconds` (13 digits long, e.g. in ``end`` and ``start`` 
+        args).
+
+        It may well be easier to instead supply a 
+        :class:`~datetime.datetime` object, as the client will handle all time
+        conversions on your behalf.
+
     Warning:
         The following methods have yet to be thoroughly tested on the mainnet;\n
-        :meth:`~Client.exit_amm_pool()`\n
-        :meth:`~Client.join_amm_pool()`\n
-        :meth:`~Client.submit_internal_transfer()`\n
-        :meth:`~Client.submit_offchain_withdrawal_request()`\n
-        :meth:`~Client.update_account_eddsa_key()`\n
+          - :meth:`~Client.exit_amm_pool()`
+          - :meth:`~Client.join_amm_pool()`
+          - :meth:`~Client.submit_internal_transfer()`
+          - :meth:`~Client.submit_offchain_withdrawal_request()`
+          - :meth:`~Client.update_account_eddsa_key()`
 
     .. _Examples: quickstart.html
 
     Args:
         account_id: The ID of your L2 account.
-        address: Your L1/ETH wallet address associated with your Loopring \
-            account.
+        address: Your L1/ETH wallet address associated with your Loopring account.
         api_key: The API Key associated with your L2 account.
         endpoint: The API endpoint to interact with.
-        handle_errors: Whether the client should raise any exceptions returned \
-            from API responses. ``False`` would mean the raw JSON response
-            would be returned, and no exception would be raised.
+        handle_errors: Whether the client should raise any exceptions returned from
+            API responses. ``False`` would mean the raw JSON response would be
+            returned, and no exception would be raised.
         nonce: Your Loopring account's nonce.
         private_key: The private key of your L2 wallet. KEEP THIS TO YOURSELF.
         publicX: A component of the EdDSA public key.
         publicY: A component of the EdDSA public key.
-        **config: A dictionary-based version of the positional arguments. It \
-            may be preferred to use this method over positional arguments, as \
-            shown in the `Examples`_.
+        **config: A dictionary-based version of the positional arguments. It may be
+            preferred to use this method over positional arguments, as shown in the
+            `Examples`_.
 
     """
 
@@ -151,11 +161,13 @@ class Client:
     markets: Dict[str, Market] = {}
     """A mapping of all markets, accessible by their trading pair (e.g ``LRC-ETH``)"""
     pools: _PoolDict = _PoolDict()
-    """A mapping of all AMM pools, accessible by their market symbol (e.g ``AMM-LRC-ETH``)"""
+    """A mapping of all AMM pools, accessible by their market symbol (e.g \
+        ``AMM-LRC-ETH``)"""
     storage_ids: Dict[int, Dict[_KT_STORAGE, int]] = {}
     """A mapping of offchain storage IDs and order IDs"""
     tokens: _TokenDict = _TokenDict()
-    """A mapping of all supported tokens on Loopring's exchange, accessible by their ID or symbol"""
+    """A mapping of all supported token configurations on Loopring's exchange, \
+        accessible by their ID or symbol (e.g ``LRC`` or ``1``)"""
 
     def __init__(self,
             account_id: int=None,
@@ -1024,28 +1036,28 @@ class Client:
             status: str=None,
             trade_channels: str=None
         ) -> List[Order]:
-        """Get a list of orders satisfying certain criteria.
+        """Get a list of your orders, satisfying certain criteria.
 
         Note:
             All arguments are optional. All string-based arguments are
-            case-insensitive. For example, `trade_channels='MIXED'` returns the
-            same results as `trade_channels='mIxEd'`.
+            case-insensitive. For example, ``trade_channels='MIXED'`` returns the
+            same results as ``trade_channels='mIxEd'``.
 
         Args:
             end: The upper bound of an order's creation time.
             limit: The maximum number of orders to be returned. Defaults to `50`.
-            market: The trading pair. Example: `'LRC-ETH'`.
-            offset: The offset of orders. Defaults to `0`.
+            market: The trading pair. Example: '`LRC-ETH`'.
+            offset: The offset of orders. Defaults to ``0``.
             order_types: Types of orders available:
-                `'LIMIT_ORDER'`, `'MAKER_ONLY'`, `'TAKER_ONLY'`, `'AMM'`. 
-            side: The type of order made, a `'BUY'` or `'SELL'`.
+                '`LIMIT_ORDER`', '`MAKER_ONLY`', '`TAKER_ONLY`', '`AMM`'. 
+            side: The type of order made, a '`BUY`' or '`SELL`'.
             start: The lower bound of an order's creation time.
             status: The order's status: \
-                `'PROCESSING'`, `'PROCESSED'`, `'FAILED'`, `'CANCELLED'`, \
-                `'CANCELLING'`, `'EXPIRED'`. Multiple statuses can be selected: \
-                `'CANCELLING, CANCELLED'`
-            trade_channels: The channel which said trade was made in: `'ORDER_BOOK'`, \
-                `'AMM_POOL'`, `'MIXED'`.
+                '`PROCESSING`', '`PROCESSED`', '`FAILED`', '`CANCELLED`', \
+                '`CANCELLING`', '`EXPIRED`'. Multiple statuses can be selected: \
+                '`CANCELLING, CANCELLED`'
+            trade_channels: The channel which said trade was made in: '`ORDER_BOOK`', \
+                '`AMM_POOL`', '`MIXED`'.
         
         Returns:
             A list of orders on a successful query. The returned list could be empty
@@ -1095,10 +1107,11 @@ class Client:
 
             return orders
 
-    # TODO: Remove `fetch()` from example?
+    # TODO: Maybe allow `str` type for ``token``,
+    #       and have the client search in `self.tokens`?
     async def get_next_storage_id(self,
             *,
-            max_next: int=None,
+            max_next: bool=None,
             token: Union[int, Token, TokenConfig]
         ) -> Dict[_KT_STORAGE, int]:
         """Get the next storage ID.
@@ -1121,10 +1134,13 @@ class Client:
             .. code-block:: python3
 
                 symbols = ["LRC", "ETH", "LINK"]
-                tokens = [fetch(client.tokens, symbol=s) for s in symbols]
+                tokens = [client.tokens[s] for s in symbols]
 
-                await asyncio.gather(*[client.get_next_storage_id(token=t) for t in tokens])
+                # Fetch all storage IDs concurrently
+                storage_ids = await asyncio.gather(*[client.get_next_storage_id(token=t) for t in tokens])
         
+                lrc_storage, eth_storage, link_storage = storage_ids
+
             It's important to not do this with too many symbols at once, as you
             could be ratelimited (TODO: check info on ratelimiting!).
 
@@ -1132,12 +1148,12 @@ class Client:
                 :py:func:`asyncio.gather()`
 
         Args:
-            max_next: ... .
-            token: The unique identifier of the token which the user wants \
-                to sell in the next order.
+            max_next: A flag denoting whether or not to return the largest \
+                available storage ID for the given ``token``.
+            token: The token which the user wants to use in the next order.
 
         Returns:
-            A :obj:`dict` containing the `orderId` and `offchainId`.
+            A :obj:`dict` containing the ``orderId`` and ``offchainId``.
 
         Raises:
             EmptyAPIKey: No API Key was supplied.
@@ -1181,25 +1197,35 @@ class Client:
             offset: int=None,
             start: Union[int, datetime]=None,
             status: str=None,
-            token_symbol: str=None,
+            token: Union[str, int, Token, TokenConfig]=None,
             withdrawal_types: str=None
         ) -> List[WithdrawalHashData]:
         """Get a user's onchain withdrawal history.
         
         Args:
-            account_id: The Account ID of the user whose withdrawal history you want \
-                to query.
-            end: --
-            hashes: --
-            limit: The number of withdrawal records to get.
-            offset: 
-            start:
-            status:
-            token_symbol:
-            withdrawal_types:
+            account_id: The account ID of the user whose withdrawal history you want
+                to query.  Leave this argument blank to default to your own
+                withdrawal history.
+            end: The time to search up to (searching from ``start`` to ``end``).
+            hashes: Used for searching for specific withdrawal transactions.  If
+                searching for multiple transactions, provide a string with each hash
+                separated by a comma (e.g. ``0xAbC,0xDeF``)
+            limit: The maximum number of withdrawal records to get.
+            offset: How many records to be offset by when searching.  Useful for
+                pagination.
+            start: The starting time to begin the search from.
+            status: Filter withdrawals by their status: '`processing`', '`processed`'
+                '`received`', '`failed`'.  Multiple values are allowed, but must be
+                separated with a comma: '`failed,received`'
+            token: The target token.  If an int is supplied, it must be the ID of a
+                token.
+            withdrawal_types: The withdrawal types to filter by.  All accepted values
+                are '`FORCE_WITHDRAWAL`', '`OFFCHAIN_WITHDRAWAL`', and  
+                '`ONCHAIN_WITHDRAWAL`'.
 
         Returns:
-            A list of 
+            A list of withdrawals, limited to a ``limit`` number of records though
+            may return less or none.
 
         Raises:
             EmptyAPIKey: No API Key was supplied.
@@ -1209,6 +1235,11 @@ class Client:
             UnknownError: Something out of your control went wrong.
 
         """
+
+        if isinstance(token, int):
+            token = self.tokens[token]
+        elif isinstance(token, Token):
+            token = self.tokens[int(token)]
 
         url = self.endpoint + PATH.USER_WITHDRAWALS
 
@@ -1223,7 +1254,7 @@ class Client:
             "offset": offset,
             "start": validate_timestamp(start),
             "status": status,
-            "tokenSymbol": token_symbol,
+            "tokenSymbol": str(token),
             "withdrawalTypes": withdrawal_types
         })
 
@@ -1243,18 +1274,28 @@ class Client:
             return withdrawals
 
     async def get_order_details(self, orderhash: str) -> Order:
-        """Get the details of an order based on order hash.
+        """Get the details of an order from an order hash.
         
         Args:
-            orderhash (str): The orderhash belonging to the order you want to
+            orderhash: The orderhash belonging to the order you want to
                 find details of.
         
         Returns:
-            :class:`~loopring.order.Order`: An instance of the order based on \
-                the given orderhash.
+            An instance of the order containing all available details related to it.
 
         Raises:
-            InvalidArguments: ...
+            EmptyAPIKey: No API Key was supplied.
+            EmptyOrderhash: No ``orderhash`` was supplied.
+            EmptyUser: No account ID was supplied.  Note that you shouldn't ever be
+                running into this error.
+            InvalidAccountID: An invalid account ID was supplied.  You don't have
+                control over the account ID other than supplying it in the client's
+                initial configuration.
+            InvalidAPIKey: An invalid API Key was supplied.  Check
+                :meth:`~loopring.client.Client.get_api_key()`.
+            InvalidArguments: Some invalid arguments were supplied.
+            OrderNotFound: The given orderhash didn't point to a valid order.
+            UnknownError: Something out of your control went wrong.
 
         """
 
@@ -1289,22 +1330,31 @@ class Client:
             start: Union[int, datetime]=None,
             status: str=None
         ) -> List[TransactionHashData]:
-        """Get eth transactions from a user from password resets on the exchange.
+        """Get a user's ETH transactions from password resets on the exchange.
         
         Args:
-            account_id (int): ... .
-            end (Union[int, :class:`~datetime.datetime`]): ... .
-            limit (int): ... .
-            offset (int): ... .
-            start (Union[int, :class:`~datetime.datetime`]): ... .
-            status (str): "`processing`", "`processed`", "`received`", "`failed`".
+            account_id: The account ID belonging to the user whose password
+                transactions you wish to retrieve.  Leave blank to default to your
+                own account.
+            end: The final time to which transactions can be dated to (from ``start``
+                to ``end``).
+            limit: The maximum number of transactions to retrieve.
+            offset: The number of transactions to offset the search by.
+            start: The initial time to start searching from.
+            status: Filter results based on their current status.  Currently
+                accepted values are currently: '`processing`', '`processed`',
+                '`received`', '`failed`'.
         
         Returns:
-            List[:obj:`~loopring.exchange.TransactionHashData`]: ... .
+            A list of all transactions initiated via password resets on the exchange.
         
         Raises:
-            EmptyAPIKey: ... .
-            InvalidAccountID: ... .
+            EmptyAPIKey: No API Key was supplied.
+            EmptyUser: No account ID was supplied.
+            InvalidAccountID: An invalid account ID was supplied.
+            InvalidAPIKey: An invalid API Key was supplied. Check
+                :meth:`~loopring.client.Client.get_api_key()`.
+            UnknownError: Something out of your control went wrong.
 
         """
 
@@ -1338,7 +1388,15 @@ class Client:
             return tx_list
 
     async def get_pending_block_transactions(self) -> List[TxModel]:
-        """Get pending txs to be packed into the next block."""
+        """Get pending txs to be packed into the next block.
+        
+        Returns:
+            A list of all pending transactions to be packed into the next block.
+
+        Raises:
+            UnknownError: Something out of your control went wrong.
+
+        """
 
         url = self.endpoint + PATH.BLOCK_PENDING_TXS
 
@@ -1367,18 +1425,21 @@ class Client:
             limit: int=20,
             fill_types: str=None
         ) -> List[Trade]:
-        """Get trades of a specific trading pair.
+        """Get recent market trades of a specific trading pair.
 
         Args:
-            market (str): Defaults to "`LRC-ETH`".
-            limit (int): Defaults to 20.
-            fill_types (str): ... .
+            market: The token pair/market whose trades to search and retrieve.
+                Defaults to "`LRC-ETH`".
+            limit: The maximum number of trades to retrieve.  This number isn't
+                guaranteed, and could be less (or 0).  Defaults to 20.
+            fill_types: Whether to search for the trades on the DEX or in an AMM
+                pool: '`dex`', '`amm`'.
 
         Returns:
-            List[:obj:`~loopring.market.Trade`]: ... .
+            A list of trades recently made on a specific market.
         
         Raises:
-            UnknownError: ...
+            UnknownError: Something out of your control went wrong.
 
         """
         url = self.endpoint + PATH.TRADE
@@ -1409,13 +1470,31 @@ class Client:
     async def get_relayer_time(self) -> datetime:
         """Get relayer's current time as a datetime object.
 
+        It is recommended to do all time-related operations relative to the relayer's
+        time.
+
+        TODO: Let the client handle timezones
+
+        Examples:
+            
+            .. code-block:: python3
+
+                # Get all orders from 2 weeks ago
+                rt = await client.get_relayer_time()
+                start = rt - timedelta(days=14)
+                end = rt - timedelta(days=7)
+
+                orders = await client.get_multiple_orders(
+                    market="LRC-ETH",
+                    start=start,
+                    end=end
+                )
+
         Returns:
-            :class:`~datetime.datetime`: The Epoch Unix Time according \
-                to the relayer.
+            The relayer's current time.
 
         Raises:
-            UnknownError: Something has gone wrong. Probably out of
-                your control. Unlucky.
+            UnknownError: Something out of your control has gone wrong.
 
         """
         url = self.endpoint + PATH.RELAYER_CURRENT_TIME
@@ -2321,7 +2400,6 @@ class Client:
 
             .. code-block:: python3
 
-                # from loopring.util import fetch
                 lrc_cfg = client.tokens["LRC"]
                 eth_cfg = client.tokens["ETH"]
 
