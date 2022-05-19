@@ -11,7 +11,7 @@ Whether this is in the form of a spelling mistake, a redesign of a class, or a n
 
 I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of the wrapper first.
 
-# PROGRESS: 38/38 REST API Endpoints done!
+# PROGRESS: 38/59 REST API Endpoints done!
 
 - Measuring progress by the [official docs](https://docs.loopring.io/en/)' REST API endpoints.
 - ~~I have yet to start on the WebSocket API!~~ I've started working on the WS API, but won't be pushing any of it until the REST API is fully documented.
@@ -29,6 +29,7 @@ I'll be adding a `CONTRIBUTING.md` file soon, but will aim to finish the bulk of
 - [x] Make a helper for volume conversion.
 - [x] Make some util functions for accessing local storage objects.
 - [x] Add a changelog to the docs
+- [ ] MINTING!
 - [ ] Learn how LP tokens are calculated/volume is decided (esp. burn fees!)
 - [ ] Finish documentation for all the endpoints.
 - [ ] Add a terminology/glossary for the API? Any keywords/terms or definitions that people should know.
